@@ -61,6 +61,8 @@
 <script src="components/ui.js" defer></script>
 <script src="components/empty-state.js" defer></script>
 <script src="components/pwa.js" defer></script>
+<script src="sync-config.js" defer></script>
+<script src="components/sync.js" defer></script>
 <script src="app.js" defer></script>
 </head>
 <body>
@@ -117,6 +119,7 @@
     <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></symbol>
     <symbol id="i-sort" viewBox="0 0 24 24"><path d="m7 15 5 5 5-5M7 9l5-5 5 5"/></symbol>
     <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c.93 0 1.5-.75 1.5-1.5 0-.39-.15-.74-.39-1.01a1.5 1.5 0 0 1 1.12-2.49H16a6 6 0 0 0 6-6c0-4.97-4.48-9-10-9z"/></symbol>
+    <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
   </defs>
 </svg>
@@ -195,6 +198,7 @@
     </div>
     <span class="net-pill" id="netStatus" role="status" hidden><svg class="ic" aria-hidden="true"><use href="#i-wifi-off"/></svg><span>Offline</span></span>
     <div class="topbar-right">
+      <button type="button" class="sync-btn" id="syncBtn" onclick="onSyncButton()" hidden data-state="off"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg><span class="sync-dot" aria-hidden="true"></span><span class="sync-label">Sync</span></button>
       <button type="button" class="btn btn-ghost hide-md" onclick="triggerImport()"><svg class="ic" aria-hidden="true"><use href="#i-import"/></svg>Import</button>
       <button type="button" class="btn btn-ghost hide-md" onclick="exportData()" title="Export all data as JSON backup"><svg class="ic" aria-hidden="true"><use href="#i-export"/></svg>Export JSON</button>
       <button type="button" class="btn btn-secondary hide-md" onclick="showExportMenu()" title="Export to Excel"><svg class="ic" aria-hidden="true"><use href="#i-table"/></svg>Excel</button>
@@ -404,6 +408,10 @@
         <p class="settings-meta" id="undoImportInfo"></p>
         <button type="button" class="btn btn-warn-soft" onclick="undoLastImport()"><svg class="ic" aria-hidden="true"><use href="#i-rework"/></svg>Undo last import</button>
       </div>
+    </div>
+    <div class="settings-card span-2" id="syncCard">
+      <h2 class="settings-title"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg>Sync across devices</h2>
+      <div id="syncCardBody"></div>
     </div>
     <div class="settings-card">
       <h2 class="settings-title"><svg class="ic" aria-hidden="true"><use href="#i-palette"/></svg>Appearance</h2>
@@ -916,6 +924,38 @@
         <button type="button" class="act-btn hold" onclick="closeModal('jobChipModal');openHold(actionJobId)">Hold</button>
         <button type="button" class="act-btn del" onclick="closeModal('jobChipModal');deleteJob(actionJobId)">Delete</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sync sign-in -->
+<div class="overlay hidden" id="syncModal">
+  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="syncModalTitle">
+    <div class="modal-hdr"><div><h2 class="modal-title" id="syncModalTitle">Sign in to sync</h2><div class="modal-sub">Use the same account on your phone and PC.</div></div><button type="button" class="modal-close" onclick="closeModal('syncModal')" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <form class="modal-body stack" onsubmit="jtSync.signIn();return false;" id="syncForm">
+      <div class="form-group fl"><input class="form-ctrl" type="email" id="syncEmail" placeholder=" " autocomplete="username" inputmode="email" required data-error="Enter your email"><label class="form-label" for="syncEmail">Email</label></div>
+      <div class="form-group fl"><input class="form-ctrl" type="password" id="syncPassword" placeholder=" " autocomplete="current-password" required data-error="Enter your password"><label class="form-label" for="syncPassword">Password</label></div>
+      <p class="field-error" id="syncSignInError" role="alert"></p>
+      <button type="button" class="link-btn" onclick="jtSync.resetPassword()">Forgot password?</button>
+      <button type="submit" hidden></button>
+    </form>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="closeModal('syncModal')">Cancel</button>
+      <button type="button" class="btn btn-primary" id="syncSignInBtn" onclick="jtSync.signIn()"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg>Sign in</button>
+    </div>
+  </div>
+</div>
+
+<!-- Sync: first sign-in on a device -->
+<div class="overlay hidden" id="syncLinkModal">
+  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="syncLinkTitle">
+    <div class="modal-hdr"><h2 class="modal-title" id="syncLinkTitle">Start syncing this device</h2></div>
+    <div class="modal-body stack" id="syncLinkBody"></div>
+    <div class="modal-footer sync-choice">
+      <button type="button" class="btn" onclick="jtSync.cancelLink()">Cancel</button>
+      <button type="button" class="btn" onclick="exportData()"><svg class="ic" aria-hidden="true"><use href="#i-import"/></svg>Export backup first</button>
+      <button type="button" class="btn btn-secondary" id="syncUseDevice" onclick="jtSync.chooseDevice()">Use this device's data</button>
+      <button type="button" class="btn btn-primary" id="syncUseCloud" onclick="jtSync.chooseCloud()"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg>Use online data</button>
     </div>
   </div>
 </div>
