@@ -141,7 +141,6 @@ Browser notes: Android Chrome, Samsung Internet, Windows Chrome/Edge and macOS C
 - **Typography:** Inter → Segoe UI → system → Arial; 16px base; `clamp()` headings.
 - **Spacing:** 8px grid (`--s1` 4px … `--s8` 48px).
 - **Radius:** 10 / 12 / 14px. **Shadows:** soft, layered.
-- **Light theme:** background `#F8FAFC`, cards `#FFFFFF`, primary `#2563EB`, secondary `#1E293B`, accent `#14B8A6`, success `#22C55E`, warning `#F59E0B`, danger `#EF4444`, text `#1E293B`.
-- **Dark theme:** background `#0F172A`, surface `#1E293B`, primary `#3B82F6`, accent `#2DD4BF`, success `#22C55E`, warning `#FBBF24`, danger `#F87171`, text `#F8FAFC`, muted `#94A3B8`.
+- **Colour scheme (v2.2, "Soft White, Sage & Olive"):** light: background `#E8E9DF`, cards `#FAFAF6`, primary/buttons deep olive `#2E3D28` (11.6:1 with white), accent sage `#A9B887`, text `#1F2A1C`, muted `#5B6656`. Dark: background `#141912`, surface `#20281D`, buttons `#4A5F3F`, accent sage `#A9B887`, text `#F3F5EE`, muted `#AEB89C`. Status colours (red overdue, green ongoing, amber rework, purple hold) are unchanged so states stay recognisable. 0 axe-core violations in both themes.
 - **Theme:** System / Light / Dark. Applied before first paint (no flash), remembered, follows the OS live in System mode, with a smooth transition when switching.
 - **Motion:** 150 / 250 / 400ms; transform/opacity-based. Page fade-up with staggered reveal, skeleton shimmer, card lift, button ripple and press, expanding job rows, fade + scale dialogs, sliding nav indicator, toast slide-in/fade-out, animated counters, progress bars and completion ring.

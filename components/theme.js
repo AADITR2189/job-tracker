@@ -31,7 +31,7 @@ function applyTheme(pref, animate) {
   root.setAttribute('data-theme-pref', pref);
 
   // Browser/OS chrome colour follows the app header
-  const bar = theme === 'dark' ? '#1E293B' : '#FFFFFF';
+  const bar = theme === 'dark' ? '#20281D' : '#FAFAF6';
   document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute('content', bar));
 
   // Sync controls
