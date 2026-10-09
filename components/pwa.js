@@ -9,7 +9,7 @@
    • Periodic background sync (where supported) to check for updates
    ════════════════════════════════════════════════════════════════════ */
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.1';
 let _deferredInstall = null;
 let _swReg = null;
 let _updateRequested = false;
