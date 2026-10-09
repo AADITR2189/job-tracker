@@ -14,7 +14,7 @@
      download the new files.
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION = 'v2.1.0';
+const CACHE_VERSION = 'v2.1.1';
 const SHELL_CACHE = `jt-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = 'jt-runtime-v1';
 
