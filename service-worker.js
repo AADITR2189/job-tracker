@@ -14,7 +14,7 @@
      download the new files.
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION = 'v2.0.0';
+const CACHE_VERSION = 'v2.1.0';
 const SHELL_CACHE = `jt-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = 'jt-runtime-v1';
 
@@ -28,6 +28,8 @@ const SHELL_ASSETS = [
   'components/ui.js',
   'components/empty-state.js',
   'components/pwa.js',
+  'components/sync.js',
+  'sync-config.js',
   'manifest.json',
   'icons/favicon.svg',
   'icons/favicon-32.png',
@@ -138,7 +140,7 @@ self.addEventListener('fetch', event => {
 
   // Google Fonts stylesheet → stale-while-revalidate; font files → cache-first
   if(url.hostname === 'fonts.googleapis.com') { event.respondWith(staleWhileRevalidate(req)); return; }
-  if(url.hostname === 'fonts.gstatic.com' || url.hostname === 'cdn.jsdelivr.net') {
+  if(url.hostname === 'fonts.gstatic.com' || url.hostname === 'cdn.jsdelivr.net' || (url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/'))) {
     event.respondWith(cacheFirst(req, RUNTIME_CACHE));
     return;
   }

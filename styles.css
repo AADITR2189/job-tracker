@@ -393,6 +393,29 @@ img, svg { display: block; max-width: 100%; }
 }
 .net-pill .ic { width: 14px; height: 14px; }
 
+/* Sync status button */
+.sync-btn {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  min-height: 44px; padding: 0 var(--s3); border-radius: var(--r-pill);
+  font-size: var(--fs-sm); font-weight: 600; color: var(--text2);
+  border: 1px solid var(--border); background: var(--surface);
+  transition: background var(--t-fast), color var(--t-fast), border-color var(--t-fast);
+}
+.sync-btn:hover { background: var(--surface2); color: var(--text); }
+.sync-btn .ic { width: 18px; height: 18px; }
+.sync-dot { position: absolute; left: 26px; top: 10px; width: 9px; height: 9px; border-radius: 50%; background: var(--gray-dot); box-shadow: 0 0 0 2px var(--surface); }
+.sync-btn[data-state="synced"] .sync-dot { background: var(--success); }
+.sync-btn[data-state="pending"] .sync-dot, .sync-btn[data-state="syncing"] .sync-dot, .sync-btn[data-state="connecting"] .sync-dot { background: var(--primary); animation: pulse 1s ease-in-out infinite; }
+.sync-btn[data-state="offline"] .sync-dot { background: var(--warning); }
+.sync-btn[data-state="error"] .sync-dot { background: var(--danger); }
+.sync-btn[data-state="error"] { color: var(--red); border-color: var(--red-border); }
+.sync-btn[data-state="signed-out"] { color: var(--primary-text); border-color: var(--blue-border); }
+@keyframes pulse { 50% { opacity: .35; } }
+@media (max-width: 767px) { .sync-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .sync-btn { width: 44px; padding: 0; justify-content: center; } .sync-dot { left: 25px; top: 11px; } }
+.sync-choice { flex-direction: column-reverse; }
+.sync-choice .btn { width: 100%; }
+#syncCardBody .field-error:empty, #syncSignInError:empty { display: none; }
+
 /* Content scroll area */
 .content-scroll {
   flex: 1; min-height: 0;

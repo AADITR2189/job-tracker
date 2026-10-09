@@ -14,12 +14,15 @@ job-tracker/
 ├── manifest.json           PWA manifest (icons, shortcuts, screenshots)
 ├── service-worker.js       Offline caching + update flow
 ├── sw.js                   Shim so devices running the v1 service worker upgrade automatically
+├── sync-config.js          Firebase project settings for sync (null = sync off)
+├── firestore.rules         Database security rules (owner-only access)
 ├── components/
 │   ├── data-compat.js      Backup validation, normalisation, safety copy / undo import
 │   ├── theme.js            Light / dark / system theme
 │   ├── ui.js               Toasts, accessible dialogs, drawer, validation, downloads, ExcelJS loader
 │   ├── empty-state.js      Illustrated empty states
-│   └── pwa.js              Install prompt, update banner, offline indicator, storage protection
+│   ├── pwa.js              Install prompt, update banner, offline indicator, storage protection
+│   └── sync.js             Optional cloud sync (Firebase): sign-in, live updates, 3-way merge
 ├── assets/logo.svg         Master logo (source for all icons)
 ├── icons/                  App icons, maskable icons, favicons, iOS splash screens, screenshots
 ├── legacy/index-v1.html    The original v1 app, unchanged (reference + emergency fallback)
@@ -38,12 +41,16 @@ npx http-server -p 8080 -c-1 .     # then open http://localhost:8080
 
 **Deploying an update:** bump `CACHE_VERSION` in `service-worker.js` (and `APP_VERSION` in `components/pwa.js`). Installed apps download the new version in the background and show an **"Update now"** banner; nothing reloads without the user's consent.
 
+## Sync across devices (optional)
+
+With a free Firebase project, the same data is available on phone and PC, with live updates and offline support. Concurrent edits are merged per record. Setup: [docs/SYNC-SETUP.md](docs/SYNC-SETUP.md). Config goes in `sync-config.js`; security rules are in `firestore.rules`. Sync is off until configured.
+
 ## Your data
 
 - Data is stored only on the device, in `localStorage` under the key **`jt_v2`** (same as v1).
 - **Export JSON** produces exactly the same file format as v1; v1 can import it.
 - **Import** accepts backups from every earlier version, shows a summary before replacing anything, and keeps a safety copy so you can **Undo last import** (Settings).
-- New keys used only for preferences: `jt_theme`, `jt_last_export`, `jt_v2_pre_import`, `jt_v2_pre_import_meta`.
+- New keys used only for preferences: `jt_theme`, `jt_last_export`, `jt_v2_pre_import`, `jt_v2_pre_import_meta`; with sync: `jt_device_id`, `jt_sync_rev:*`, `jt_sync_dirty:*`, `jt_sync_last`.
 - Export a JSON backup regularly. Browsers can clear website storage if the device runs low on space; installing the app and the "Protect storage" option in Settings reduce that risk.
 
 ## Tests
@@ -54,6 +61,8 @@ node tests/make-fixtures.js                                   # synthetic backup
 node tests/compat.test.js path/to/your-backup.json            # v1 vs v2: calculations, filters, planning, reports, import/export
 node tests/import-legacy.test.js                              # early-format backup (with BOM) restores
 node tests/interactions.test.js                               # forms, rework, hold, share, Excel, theme, offline, mobile
+# two-device sync against the Firebase emulators (see header of tests/sync.test.js)
+cd tests/firebase && npx firebase-tools emulators:exec --project demo-jt --only auth,firestore "FIREBASE_LIB_DIR=... node ../sync.test.js"
 ```
 
 Requires Playwright with Chromium (`npm i -D playwright`). If the CDN is unreachable in your environment, set `EXCELJS_FILE=/path/to/exceljs.min.js` for the Excel tests.

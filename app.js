@@ -46,12 +46,12 @@ document.addEventListener('DOMContentLoaded', boot);
 
 function save() {
   const data = JSON.stringify(JT);
-  try { localStorage.setItem('jt_v2', data); }
+  try { localStorage.setItem('jt_v2', data); if(typeof jtSync !== 'undefined') jtSync.localChanged(); }
   catch(e) {
     // Live data always wins over the optional pre-import safety copy
     if(jtGetPreImportMeta()) {
       jtClearPreImport();
-      try { localStorage.setItem('jt_v2', data); showToast('Storage was full: the old pre-import safety copy was removed to save your changes.'); return; }
+      try { localStorage.setItem('jt_v2', data); if(typeof jtSync !== 'undefined') jtSync.localChanged(); showToast('Storage was full: the old pre-import safety copy was removed to save your changes.'); return; }
       catch(e2) {}
     }
     console.error('Save failed', e);
