@@ -14,7 +14,7 @@
      download the new files.
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION = 'v2.2.0';
+const CACHE_VERSION = 'v2.3.0';
 const SHELL_CACHE = `jt-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = 'jt-runtime-v1';
 
@@ -29,6 +29,7 @@ const SHELL_ASSETS = [
   'components/empty-state.js',
   'components/pwa.js',
   'components/sync.js',
+  'components/motion.js',
   'sync-config.js',
   'manifest.json',
   'icons/favicon.svg',

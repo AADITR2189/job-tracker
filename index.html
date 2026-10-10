@@ -24,6 +24,7 @@
   var dark=p==='dark'||(p!=='light'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
   r.setAttribute('data-theme',dark?'dark':'light');
   r.setAttribute('data-theme-pref',p);
+  try{if(sessionStorage.getItem('jt_launched'))r.classList.add('no-launch');}catch(e){}
 })();
 </script>
 
@@ -124,6 +125,14 @@
   </defs>
 </svg>
 
+<!-- Launch animation (shown once per session; removed by components/motion.js) -->
+<div id="launch" aria-hidden="true">
+  <div class="launch-mark">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3" pathLength="1"/><path d="M12 22V8" pathLength="1"/><path d="M8.5 11h7" pathLength="1"/><path d="M5 12H2a10 10 0 0 0 20 0h-3" pathLength="1"/></svg>
+  </div>
+  <div class="launch-name">Job Tracker</div>
+</div>
+
 <a class="skip-link" href="#contentScroll">Skip to main content</a>
 
 <div class="app" id="app">
@@ -198,7 +207,7 @@
     </div>
     <span class="net-pill" id="netStatus" role="status" hidden><svg class="ic" aria-hidden="true"><use href="#i-wifi-off"/></svg><span>Offline</span></span>
     <div class="topbar-right">
-      <button type="button" class="sync-btn" id="syncBtn" onclick="onSyncButton()" hidden data-state="off"><svg class="ic" aria-hidden="true"><use href="#i-cloud"/></svg><span class="sync-dot" aria-hidden="true"></span><span class="sync-label">Sync</span></button>
+      <button type="button" class="sync-btn" id="syncBtn" onclick="onSyncButton()" hidden data-state="off"><span class="sync-ic" aria-hidden="true"><svg class="ic"><use href="#i-cloud"/></svg><svg class="ic sync-spin"><use href="#i-rework"/></svg><svg class="ic sync-ok"><use href="#i-check"/></svg></span><span class="sync-dot" aria-hidden="true"></span><span class="sync-label">Sync</span></button>
       <button type="button" class="btn btn-ghost hide-md" onclick="triggerImport()"><svg class="ic" aria-hidden="true"><use href="#i-import"/></svg>Import</button>
       <button type="button" class="btn btn-ghost hide-md" onclick="exportData()" title="Export all data as JSON backup"><svg class="ic" aria-hidden="true"><use href="#i-export"/></svg>Export JSON</button>
       <button type="button" class="btn btn-secondary hide-md" onclick="showExportMenu()" title="Export to Excel"><svg class="ic" aria-hidden="true"><use href="#i-table"/></svg>Excel</button>

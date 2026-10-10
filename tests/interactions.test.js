@@ -99,6 +99,7 @@ let fail = 0; const ok = (n, c, extra) => { console.log(c ? '✓' : '✗', n, ex
 
   // Theme
   await p.evaluate(() => setThemePref('dark'));
+  await p.waitForFunction(() => document.documentElement.getAttribute('data-theme') === 'dark', null, { timeout: 3000 }).catch(() => {}); // applied inside the reveal animation
   ok('dark theme applies + persists', (await p.getAttribute('html', 'data-theme')) === 'dark' && await p.evaluate(() => localStorage.getItem('jt_theme')) === 'dark');
   await p.reload(); await p.waitForTimeout(300);
   ok('no theme flash: dark set before paint', (await p.getAttribute('html', 'data-theme')) === 'dark');
