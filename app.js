@@ -40,9 +40,29 @@ function boot() {
   handleLaunchParams();
   renderSettingsInfo();
   document.documentElement.classList.add('app-ready');
+  finishLaunch();
+}
+
+// Fade out the launch animation (shown once per session) as soon as the app is ready
+function finishLaunch() {
+  const el = document.getElementById('launch');
+  if(!el) return;
+  const quick = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  setTimeout(() => {
+    el.classList.add('launch-done');
+    try { sessionStorage.setItem('jt_launched', '1'); } catch(e) {}
+    setTimeout(() => el.remove(), quick ? 0 : 380);
+  }, quick ? 0 : Math.max(0, 700 - performance.now()));
 }
 // Scripts are deferred, so DOMContentLoaded always fires after this file has fully loaded.
 document.addEventListener('DOMContentLoaded', boot);
+
+// Animations (components/motion.js) load after the page is shown, so they never delay start-up
+window.addEventListener('load', () => {
+  const s = document.createElement('script');
+  s.src = 'components/motion.js';
+  document.body.appendChild(s);
+});
 
 function save() {
   const data = JSON.stringify(JT);

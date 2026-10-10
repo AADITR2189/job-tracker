@@ -1741,6 +1741,106 @@ html:not(.app-ready) #page-dashboard > .section-card { visibility: hidden; anima
   .bnav-btn span { display: none; }
 }
 
+
+/* ═════════════ 17. MOTION (see components/motion.js) ═════════════ */
+
+/* 1 · Launch */
+#launch {
+  position: fixed; inset: 0; z-index: 4000;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--s4);
+  background: var(--bg);
+  transition: opacity 350ms var(--ease), transform 350ms var(--ease-out), visibility 0s linear 350ms;
+  animation: launchFailsafe 0s 2.5s forwards;
+}
+html.no-launch #launch { display: none; }
+#launch.launch-done { opacity: 0; transform: scale(1.03); visibility: hidden; pointer-events: none; }
+.launch-mark {
+  width: 96px; height: 96px; border-radius: 26px; display: grid; place-items: center;
+  background: linear-gradient(135deg, #2E3D28 0%, #6F8A55 100%);
+  box-shadow: 0 18px 40px -16px rgba(46, 61, 40, .6);
+  animation: launchPop 520ms var(--ease-out) both;
+}
+.launch-mark svg { width: 54px; height: 54px; fill: none; stroke: #fff; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; }
+.launch-mark svg * { stroke-dasharray: 1; stroke-dashoffset: 1; animation: launchDraw 620ms var(--ease) forwards; }
+.launch-mark svg path:nth-child(2) { animation-delay: 120ms; }
+.launch-mark svg path:nth-child(3) { animation-delay: 200ms; }
+.launch-mark svg path:nth-child(4) { animation-delay: 260ms; }
+.launch-name { font-weight: 800; font-size: 1.375rem; letter-spacing: -.02em; color: var(--text); animation: fadeUp 500ms 250ms var(--ease-out) both; }
+@keyframes launchPop  { from { transform: scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes launchDraw { to { stroke-dashoffset: 0; } }
+@keyframes launchFailsafe { to { visibility: hidden; opacity: 0; pointer-events: none; } }
+
+/* 2 · Page transitions (browsers with View Transitions) */
+html.vt-page .page.page-enter > * { animation: none; }
+html.vt-page::view-transition-old(root) { animation: vtOut 200ms var(--ease) both; }
+html.vt-page::view-transition-new(root) { animation: vtIn 280ms var(--ease-out) both; }
+html.vt-page[data-nav-dir="back"]::view-transition-old(root) { animation-name: vtOutBack; }
+html.vt-page[data-nav-dir="back"]::view-transition-new(root) { animation-name: vtInBack; }
+@keyframes vtOut     { to   { opacity: 0; transform: translateX(-14px); } }
+@keyframes vtIn      { from { opacity: 0; transform: translateX(18px); } }
+@keyframes vtOutBack { to   { opacity: 0; transform: translateX(14px); } }
+@keyframes vtInBack  { from { opacity: 0; transform: translateX(-18px); } }
+
+/* 3 · Theme circular reveal */
+html.vt-theme::view-transition-old(root), html.vt-theme::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+html.vt-theme::view-transition-new(root) { z-index: 2; }
+
+/* 4 · Sync button states */
+.sync-ic { position: relative; width: 18px; height: 18px; display: inline-grid; place-items: center; }
+.sync-ic .ic { grid-area: 1 / 1; }
+.sync-spin, .sync-ok { width: 10px !important; height: 10px !important; stroke-width: 3.2; opacity: 0; transform: translateY(1px); }
+.sync-btn[data-state="syncing"] .sync-spin, .sync-btn[data-state="pending"] .sync-spin, .sync-btn[data-state="connecting"] .sync-spin { opacity: 1; animation: spin 900ms linear infinite; }
+.sync-btn[data-state="synced"] .sync-ok { opacity: 1; color: var(--green); animation: okPop 480ms var(--ease-out); }
+.sync-btn[data-state="offline"] .sync-dot { animation: pulse 1.6s ease-in-out infinite; }
+@keyframes spin  { from { transform: translateY(1px) rotate(0); } to { transform: translateY(1px) rotate(360deg); } }
+@keyframes okPop { 0% { transform: translateY(1px) scale(0); } 60% { transform: translateY(1px) scale(1.4); } 100% { transform: translateY(1px) scale(1); } }
+
+/* 5 · Completion celebration */
+.celebrate { position: fixed; inset: 0; z-index: 2500; pointer-events: none; overflow: hidden; }
+.celebrate i { position: absolute; width: 9px; height: 13px; border-radius: 2px; will-change: transform, opacity; }
+.celebrate-check {
+  position: absolute; left: 50%; top: 50%; width: 84px; height: 84px; margin: -42px 0 0 -42px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--primary-btn); box-shadow: 0 16px 40px -10px rgba(0,0,0,.45);
+  animation: celebrateCheck 1100ms var(--ease-out) forwards;
+}
+.celebrate-check svg { width: 44px; height: 44px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; animation: launchDrawCheck 420ms 120ms var(--ease) forwards; }
+@keyframes launchDrawCheck { to { stroke-dashoffset: 0; } }
+@keyframes celebrateCheck { 0% { transform: scale(.3); opacity: 0; } 25% { transform: scale(1.08); opacity: 1; } 40% { transform: scale(1); } 80% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(.9); } }
+
+/* 7 · New-row glow (edited rows use .flash) */
+.jrow.glow-new { animation: glowNew 2.4s var(--ease); }
+@keyframes glowNew { 0% { background: color-mix(in srgb, var(--accent) 35%, var(--surface)); } 100% { background: var(--surface); } }
+
+/* 9 · Sliding status-tab indicator */
+.tab-bar.has-ind { position: relative; }
+.tab-ind {
+  position: absolute; left: 0; top: 0; z-index: 0; border-radius: var(--r-pill);
+  background: var(--secondary); box-shadow: var(--shadow);
+  transition: transform 300ms var(--ease-out), width 300ms var(--ease-out), height 300ms var(--ease-out), background 200ms;
+  pointer-events: none;
+}
+:root[data-theme="dark"] .tab-ind { background: var(--primary-btn); }
+.tab-ind.is-danger { background: #B91C1C !important; }
+.tab-bar.has-ind .tab-btn { position: relative; z-index: 1; }
+.tab-bar.has-ind .tab-btn.active { background: transparent; border-color: transparent; box-shadow: none; }
+
+/* 10 · Overdue alert: one gentle shake when shown */
+.alert-box .ai .ic { animation: shake 700ms 350ms var(--ease) 1; transform-origin: 50% 20%; }
+@keyframes shake { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-14deg); } 40% { transform: rotate(11deg); } 60% { transform: rotate(-7deg); } 80% { transform: rotate(4deg); } }
+
+/* 11 · Empty-state illustrations */
+.empty-art { animation: floatY 4.5s ease-in-out infinite; }
+.empty-art .ea-line { stroke-dasharray: 120; stroke-dashoffset: 120; animation: drawLine 900ms 200ms var(--ease) forwards; }
+@keyframes floatY   { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@keyframes drawLine { to { stroke-dashoffset: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  #launch { display: none; }
+  .celebrate { display: none; }
+  .empty-art .ea-line { stroke-dashoffset: 0; }
+  ::view-transition-old(root), ::view-transition-new(root) { animation: none !important; }
+}
+
 /* Print: clean data-only output */
 @media print {
   body { overflow: visible; height: auto; background: #fff; color: #000; }
