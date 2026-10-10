@@ -43,6 +43,19 @@ let fail = 0; const ok = (n, c, x) => { console.log(c ? '✓' : '✗', n, x ?? '
   await p.waitForTimeout(800);
   ok('progress ends at the new value', await p.evaluate(i => document.querySelector('#jcard-' + i + ' .mini-pct').textContent === '63%', id));
 
+  // 6b in-place update far down the list: no rebuild, no scroll jump, bar glides
+  await p.fill('#jobSearch', ''); await p.waitForTimeout(600);
+  const far = await p.evaluate(() => { const rows = [...document.querySelectorAll('#jobsBody .jrow')]; const r = rows.slice(45).find(r => { const j = JT.jobs.find(x => 'jcard-' + x.id === r.id); return j && !['complete','cancelled','rework completed'].includes(j.status) && (j.completionPercentage || 0) < 40; }); r.scrollIntoView({ block: 'center' }); rows[3].dataset.keep = '1'; return +r.id.slice(6); });
+  await p.waitForTimeout(300);
+  const st0 = await p.evaluate(() => document.getElementById('contentScroll').scrollTop);
+  await p.evaluate(i => quickPctChange(i, 90), far); await p.waitForTimeout(350);
+  const mid = await p.evaluate(i => { const s = document.querySelector('#jcard-' + i + ' .mini-progress > span'); return s.getBoundingClientRect().width / s.parentElement.getBoundingClientRect().width * 100; }, far);
+  await p.waitForTimeout(800);
+  ok('% change far down: page does not jump', await p.evaluate(() => document.getElementById('contentScroll').scrollTop) === st0);
+  ok('% change: other rows are not rebuilt', await p.evaluate(() => !!document.querySelector('[data-keep="1"]')));
+  ok('% change: bar glides (mid-way value between old and new)', mid > 5 && mid < 88, Math.round(mid) + '%');
+  ok('% change: ends at 90% and is saved', await p.evaluate(i => document.querySelector('#jcard-' + i + ' .mini-pct').textContent === '90%' && JSON.parse(localStorage.getItem('jt_v2')).jobs.find(j => j.id === i).completionPercentage === 90, far));
+
   // 7 new row glow
   await p.fill('#jobSearch', 'Motion Test'); await p.waitForTimeout(200);
   await p.evaluate(() => { openAddJob(); document.getElementById('fVessel').value = 'Motion Test'; saveJob(); });

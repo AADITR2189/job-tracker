@@ -112,16 +112,17 @@
     if(!reduced()) {
       const oldPct = pctMem.get(id);
       if(oldPct !== undefined && oldPct !== pct) {
-        const opts = { duration: 650, easing: EASE };
-        row.querySelector('.mini-progress > span')?.animate([{ width: oldPct + '%' }, { width: pct + '%' }], opts);
+        const opts = { duration: 900, easing: 'cubic-bezier(.45, 0, .2, 1)' };  // gentle ease-in-out glide
+        const barAnim = row.querySelector('.mini-progress > span')?.animate([{ width: oldPct + '%' }, { width: pct + '%' }], opts);
         row.querySelector('.jrow-progress')?.animate([{ width: oldPct + '%' }, { width: pct + '%' }], opts);
         const label = row.querySelector('.mini-pct');
-        if(label) {
-          const start = performance.now();
-          const step = now => {
-            const k = Math.min(1, (now - start) / 650), e = 1 - Math.pow(1 - k, 3);
-            label.textContent = Math.round(oldPct + (pct - oldPct) * e) + '%';
-            if(k < 1) requestAnimationFrame(step);
+        if(label && barAnim) {
+          // The number follows the bar exactly (same easing, same clock)
+          const step = () => {
+            const t = barAnim.effect.getComputedTiming().progress;
+            const done = t === null || barAnim.playState === 'finished';
+            label.textContent = Math.round(done ? pct : oldPct + (pct - oldPct) * t) + '%';
+            if(!done && label.isConnected) requestAnimationFrame(step);
           };
           requestAnimationFrame(step);
         }
