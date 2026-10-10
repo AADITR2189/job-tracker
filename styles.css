@@ -1770,16 +1770,19 @@ html.no-launch #launch { display: none; }
 @keyframes launchDraw { to { stroke-dashoffset: 0; } }
 @keyframes launchFailsafe { to { visibility: hidden; opacity: 0; pointer-events: none; } }
 
-/* 2 · Page transitions (browsers with View Transitions) */
+/* 2 · Page transitions (browsers with View Transitions)
+   Only the content area animates; sidebar, header and bottom nav stay perfectly still
+   (animating the whole screen looked like a page reload). */
 html.vt-page .page.page-enter > * { animation: none; }
-html.vt-page::view-transition-old(root) { animation: vtOut 200ms var(--ease) both; }
-html.vt-page::view-transition-new(root) { animation: vtIn 280ms var(--ease-out) both; }
-html.vt-page[data-nav-dir="back"]::view-transition-old(root) { animation-name: vtOutBack; }
-html.vt-page[data-nav-dir="back"]::view-transition-new(root) { animation-name: vtInBack; }
-@keyframes vtOut     { to   { opacity: 0; transform: translateX(-14px); } }
-@keyframes vtIn      { from { opacity: 0; transform: translateX(18px); } }
-@keyframes vtOutBack { to   { opacity: 0; transform: translateX(14px); } }
-@keyframes vtInBack  { from { opacity: 0; transform: translateX(-18px); } }
+html.vt-page .content-scroll { view-transition-name: jt-page; }
+html.vt-page::view-transition-old(root), html.vt-page::view-transition-new(root) { animation: none; }
+html.vt-page::view-transition-group(jt-page) { animation-duration: 0s; }
+html.vt-page::view-transition-old(jt-page) { animation: vtOut 140ms var(--ease) both; }
+html.vt-page::view-transition-new(jt-page) { animation: vtIn 240ms var(--ease-out) both; }
+html.vt-page[data-nav-dir="back"]::view-transition-new(jt-page) { animation-name: vtInBack; }
+@keyframes vtOut    { to   { opacity: 0; } }
+@keyframes vtIn     { from { opacity: 0; transform: translateX(12px); } }
+@keyframes vtInBack { from { opacity: 0; transform: translateX(-12px); } }
 
 /* 3 · Theme circular reveal */
 html.vt-theme::view-transition-old(root), html.vt-theme::view-transition-new(root) { animation: none; mix-blend-mode: normal; }

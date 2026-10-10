@@ -544,11 +544,13 @@ function toggleJobDetails(id, btn) {
   btn.closest('.jrow')?.classList.toggle('expanded', open);
   if(open) {
     _expandedJobs.add(id);
+    _rowSig.set(id, JSON.stringify(j) + '|x');
     panel.querySelector('.jd-inner').innerHTML = jobDetailsHTML(j);
     panel.hidden = false;
     requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
   } else {
     _expandedJobs.delete(id);
+    _rowSig.set(id, JSON.stringify(j));
     panel.classList.remove('open');
     const done = () => { if(!panel.classList.contains('open')) panel.hidden = true; };
     panel.addEventListener('transitionend', done, { once:true });
@@ -795,6 +797,7 @@ function getFilteredJobs() {
 }
 
 let _jobRenderToken = 0, _jobRenderFlush = null;
+const _rowSig = new Map(); // job id → data signature of the row currently on screen
 function renderJobsPage() {
   updateSidebarCounts();
   const jobs = applyJobSort(getFilteredJobs());
@@ -803,8 +806,30 @@ function renderJobsPage() {
   updateFilterCount();
   const wrap = document.getElementById('jobsListWrap');
   const term = (document.getElementById('jobSearch')?.value||'').toLowerCase().trim();
+
+  // Same jobs in the same order as on screen (e.g. a % or status change)? Update only the
+  // rows that changed, in place: no rebuild, no scroll jump, and progress bars can glide.
+  const listKey = jobs.map(j=>j.id).join(',') + '|' + term + '|' + jobSortKey + ':' + jobSortDir;
+  if(jobs.length && wrap.dataset.listKey === listKey && document.getElementById('jobsBody')) {
+    jobs.forEach(j => {
+      const sig = JSON.stringify(j) + (_expandedJobs.has(j.id) ? '|x' : '');
+      if(_rowSig.get(j.id) === sig) return;
+      const el = document.getElementById('jcard-' + j.id);
+      if(!el) return;                       // not rendered yet: the progressive renderer will draw it fresh
+      _rowSig.set(j.id, sig);
+      const focusName = el.contains(document.activeElement) ? (document.activeElement.name || document.activeElement.className) : null;
+      const tmp = document.createElement('div');
+      tmp.innerHTML = renderJobCard(j, term);
+      const row = tmp.firstElementChild;
+      el.replaceWith(row);
+      if(focusName) { const f = row.querySelector(`[name="${focusName}"]`) || row.getElementsByClassName(focusName)[0]; if(f) f.focus({ preventScroll: true }); }
+    });
+    return;
+  }
+
   const token = ++_jobRenderToken;
   _jobRenderFlush = null;
+  wrap.dataset.listKey = jobs.length ? listKey : '';
 
   if(jobs.length===0) {
     const filtered = JT.jobs.length > 0;
@@ -822,12 +847,13 @@ function renderJobsPage() {
 
   // Progressive rendering: first rows immediately, the rest in small batches
   const FIRST = 40, CHUNK = 120;
-  wrap.innerHTML = `<h2 class="sr-only">Job list</h2>` + head + `<div class="jobs-body" id="jobsBody">${jobs.slice(0, FIRST).map(j=>renderJobCard(j, term)).join('')}</div>`;
+  const card = j => { _rowSig.set(j.id, JSON.stringify(j) + (_expandedJobs.has(j.id) ? '|x' : '')); return renderJobCard(j, term); };
+  wrap.innerHTML = `<h2 class="sr-only">Job list</h2>` + head + `<div class="jobs-body" id="jobsBody">${jobs.slice(0, FIRST).map(card).join('')}</div>`;
   let i = FIRST;
   const body = document.getElementById('jobsBody');
   const appendChunk = n => {
     if(token !== _jobRenderToken || i >= jobs.length) return;
-    body.insertAdjacentHTML('beforeend', jobs.slice(i, i + n).map(j=>renderJobCard(j, term)).join(''));
+    body.insertAdjacentHTML('beforeend', jobs.slice(i, i + n).map(card).join(''));
     i += n;
   };
   _jobRenderFlush = () => { while(token === _jobRenderToken && i < jobs.length) appendChunk(CHUNK); };
