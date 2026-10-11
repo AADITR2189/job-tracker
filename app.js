@@ -584,7 +584,7 @@ function renderJobCard(j, term) {
         ${person?`<button type="button" class="link-btn" onclick="filterByPerson(${jsArg(person)})" title="Show jobs for ${esc(person)}">${hl(person, term)}</button>`:'<span class="muted">Unassigned</span>'}
         <span class="jrow-sub">${esc(j.location)}</span>
       </div>
-      <div class="jc jc-status">${statusBadges}</div>
+      <div class="jc jc-status">${statusBadges}<span class="st-prio">${priorityBadge(j.priorityLevel)}</span></div>
       <div class="jc jc-priority">${priorityBadge(j.priorityLevel)}</div>
       <div class="jc jc-meta">
         <span class="meta-item">${ic('users')}${person?`<button type="button" class="link-btn" onclick="filterByPerson(${jsArg(person)})">${hl(person, term)}</button>`:'<span class="muted">Unassigned</span>'}</span>
