@@ -20,20 +20,15 @@
 
   /* ── 1. Launch animation: markup + CSS; removed by finishLaunch() in app.js boot() ── */
 
-  /* ── 2. Page transitions (View Transitions API, directional) ─────── */
+  /* ── 2. Page transitions: the new page's sections glide in (direction-aware) ──
+     A plain CSS animation (not a view transition), so taps are never blocked while it plays. */
   const ORDER = ['dashboard','jobs','planning','upcoming','persons','reports','settings'];
   const currentPage = () => (document.querySelector('.page.active') || {}).id?.replace('page-','');
   const _showPage = showPage;
   showPage = function(name, btn) {
     const from = currentPage();
-    if(!canVT() || !from || from === name || document.getElementById('launch')) return _showPage(name, btn);
-    const root = document.documentElement;
-    root.dataset.navDir = ORDER.indexOf(name) >= ORDER.indexOf(from) ? 'fwd' : 'back';
-    root.classList.add('vt-page');
-    let t;
-    try { t = document.startViewTransition(() => _showPage(name, btn)); }
-    catch(e) { root.classList.remove('vt-page'); return _showPage(name, btn); }
-    t.finished.finally(() => root.classList.remove('vt-page'));
+    if(from && from !== name) document.documentElement.dataset.navDir = ORDER.indexOf(name) >= ORDER.indexOf(from) ? 'fwd' : 'back';
+    return _showPage(name, btn);
   };
 
   /* ── 3. Theme switch: circular reveal from the button ────────────── */

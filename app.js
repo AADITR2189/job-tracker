@@ -35,6 +35,10 @@ function boot() {
     }
   }
   else loadSample();
+  // Location always follows the person in charge (older data could disagree)
+  const fixedLoc = syncJobLocations();
+  if(fixedLoc) { save(); setTimeout(() => showToast(`Location updated on ${fixedLoc} job${fixedLoc>1?'s':''} to match the assigned person`, 'ok'), 900); }
+  resetActivityBase();
   renderAll();
   initScrollTop();
   handleLaunchParams();
@@ -58,14 +62,21 @@ function finishLaunch() {
 document.addEventListener('DOMContentLoaded', boot);
 
 // Animations (components/motion.js) load after the page is shown, so they never delay start-up
+// Extra features load the same way, in order, after start-up
+const LAZY_SCRIPTS = ['components/motion.js','components/drag.js','components/jobs-plus.js','components/planning-plus.js','components/insights.js','components/palette.js'];
 window.addEventListener('load', () => {
-  const s = document.createElement('script');
-  s.src = 'components/motion.js';
-  document.body.appendChild(s);
+  LAZY_SCRIPTS.forEach(src => {
+    const s = document.createElement('script');
+    s.src = src; s.async = false;   // keep order
+    document.body.appendChild(s);
+  });
 });
 
 function save() {
+  syncJobLocations();
+  logJobChanges();
   const data = JSON.stringify(JT);
+  try { _undoSnap = localStorage.getItem('jt_v2'); } catch(e) { _undoSnap = null; }
   try { localStorage.setItem('jt_v2', data); if(typeof jtSync !== 'undefined') jtSync.localChanged(); }
   catch(e) {
     // Live data always wins over the optional pre-import safety copy
@@ -76,6 +87,77 @@ function save() {
     }
     console.error('Save failed', e);
     showToast('Could not save: device storage is full. Export a JSON backup now to keep your changes.', 'err');
+  }
+}
+
+// ── Location follows the assigned person ──
+// A job's (or upcoming job's) location is the location of its person in charge.
+// Jobs without a person (or with a person no longer in the list) keep their own location.
+function personLocation(name) {
+  const p = name ? JT.persons.find(x => x.name === name) : null;
+  return p ? p.location : null;
+}
+function syncJobLocations() {
+  const map = new Map(JT.persons.map(p => [p.name, p.location]));
+  let n = 0;
+  const fix = list => (list || []).forEach(j => {
+    const l = j.personInCharge ? map.get(j.personInCharge) : null;
+    if(l && j.location !== l) { j.location = l; n++; }
+  });
+  fix(JT.jobs); fix(JT.upcomingJobs);
+  return n;
+}
+
+// ── Undo: the state before the latest save can be restored from a toast ──
+let _undoSnap = null;
+function toastUndo(msg) {
+  const snap = _undoSnap;
+  if(!snap) { showToast(msg, 'ok'); return; }
+  showToast(msg, 'ok', { action: 'Undo', onAction: () => {
+    try {
+      JT = jtNormalize(JSON.parse(snap));
+      save(); renderAll();
+      showToast('Undone', 'ok');
+    } catch(e) { showToast('Could not undo', 'err'); }
+  }});
+}
+
+// ── Activity log: what changed on each job, and when (stored as job.activityLog) ──
+// Older app versions simply ignore the extra field, so backups stay compatible.
+const LOG_FIELDS = ['status','completionPercentage','personInCharge','targetDate','priorityLevel','plannedStartDate','holdStartDate'];
+const LOG_MAX = 25;
+let _logBase = null, _logBaseFor = null;
+const _logSnap = j => LOG_FIELDS.map(f => j[f] ?? null);
+function resetActivityBase() { _logBase = new Map(JT.jobs.map(j => [j.id, _logSnap(j)])); _logBaseFor = JT; }
+function logJobChanges() {
+  // Data replaced as a whole (import, undo, sync, other tab): start a new baseline, log nothing
+  if(!_logBase || _logBaseFor !== JT) { resetActivityBase(); return; }
+  const t = new Date().toISOString();
+  JT.jobs.forEach(j => {
+    const prev = _logBase.get(j.id), cur = _logSnap(j);
+    const entries = [];
+    if(!prev) entries.push({ t, f: 'created' });
+    else LOG_FIELDS.forEach((f, i) => { if(prev[i] !== cur[i]) entries.push({ t, f, a: prev[i], b: cur[i] }); });
+    if(!entries.length) return;
+    const log = Array.isArray(j.activityLog) ? j.activityLog : [];
+    log.push(...entries);
+    if(log.length > LOG_MAX) log.splice(0, log.length - LOG_MAX);
+    j.activityLog = log;
+  });
+  resetActivityBase();
+}
+function activityText(e) {
+  const v = x => (x === null || x === undefined || x === '') ? '—' : x;
+  switch(e.f) {
+    case 'created': return 'Job added';
+    case 'status': return `Status: ${esc(v(e.a))} → <strong>${esc(v(e.b))}</strong>`;
+    case 'completionPercentage': return `Progress ${e.a||0}% → <strong>${e.b||0}%</strong>`;
+    case 'personInCharge': return `Person: ${esc(v(e.a))} → <strong>${esc(v(e.b))}</strong>`;
+    case 'targetDate': return `Target date: ${fmtD(e.a)} → <strong>${fmtD(e.b)}</strong>`;
+    case 'priorityLevel': return `Priority: ${esc(v(e.a))} → <strong>${esc(v(e.b))}</strong>`;
+    case 'plannedStartDate': return `Planned start: ${fmtD(e.a)} → <strong>${fmtD(e.b)}</strong>`;
+    case 'holdStartDate': return e.b ? `Put on hold from ${fmtD(e.b)}` : 'Hold removed';
+    default: return esc(e.f);
   }
 }
 
@@ -192,6 +274,7 @@ const ALL_STATUSES = [...REGULAR_STATUSES,'rework ongoing','rework planned','rew
 
 // ===================== RENDER ALL =====================
 function renderAll() {
+  if(syncJobLocations()) setTimeout(save, 0);
   // v1 cleared the planning date cache only inside renderPlanning(), after the
   // dashboard had already used it — so availability could lag one change behind.
   clearJobDateCache();
@@ -201,7 +284,7 @@ function renderAll() {
   if(isPageActive('jobs')) renderJobsPage();
   if(isPageActive('planning')) renderPlanning();
   renderUpcoming();
-  renderPersons();
+  if(isPageActive('persons')) renderPersons();
   populatePersonDropdowns();
   populatePersonFilter();
   populatePlanPersonFilter();
@@ -478,10 +561,12 @@ function renderJobCard(j, term) {
       ? `<button type="button" class="act-btn resume" onclick="resumeJob(${j.id})" title="Resume" aria-label="Resume ${esc(label)}">${ic('play')}<span class="lbl">Resume</span></button>`
       : `<button type="button" class="act-btn hold${j.holdStartDate?' is-on':''}" onclick="openHold(${j.id})" title="${j.holdStartDate?'Manage Hold':'Hold Job'}" aria-label="${j.holdStartDate?'Manage hold for':'Hold'} ${esc(label)}">${ic('pause')}<span class="lbl">${j.holdStartDate?'Manage hold':'Hold'}</span></button>`;
 
-  return `<article class="jrow ${over?'overdue':approaching?'due-soon':''}${expanded?' expanded':''}" id="jcard-${j.id}" aria-label="${esc(label)}">
+  return `<article class="jrow ${over?'overdue':approaching?'due-soon':''}${expanded?' expanded':''}${_selectMode&&_selectedJobs.has(j.id)?' is-selected':''}" id="jcard-${j.id}" aria-label="${esc(label)}">
     <div class="jrow-progress" style="--pct:${Math.min(100,pct)}%" aria-hidden="true"></div>
     <div class="jrow-main">
-      <button type="button" class="jrow-expand" onclick="toggleJobDetails(${j.id},this)" aria-expanded="${expanded}" aria-controls="jdet-${j.id}" aria-label="Details for ${esc(label)}">${ic('chevron-down')}</button>
+      ${_selectMode
+        ? `<label class="jrow-check"><input type="checkbox" onchange="toggleJobSelect(${j.id},this.checked)"${_selectedJobs.has(j.id)?' checked':''} aria-label="Select ${esc(label)}"></label>`
+        : `<button type="button" class="jrow-expand" onclick="toggleJobDetails(${j.id},this)" aria-expanded="${expanded}" aria-controls="jdet-${j.id}" aria-label="Details for ${esc(label)}">${ic('chevron-down')}</button>`}
       <div class="jc jc-num">
         <span class="badge b-jobnum">${hl(j.jobNumber||'—', term)}</span>
         ${flags}
@@ -519,12 +604,17 @@ function renderJobCard(j, term) {
             onblur="if(this.value!==String(${pct}))quickPctChange(${j.id},this.value)">
           <span aria-hidden="true">%</span>
         </form>
+        ${pct<100 && !['complete','rework completed','cancelled'].includes(j.status) ? `<span class="pct-steps">
+          <button type="button" class="act-btn pct-step" onclick="quickPctChange(${j.id},${Math.min(100,pct+10)})" title="Add 10%" aria-label="Add 10% to ${esc(label)}">+10%</button>
+          <button type="button" class="act-btn pct-step pct-full" onclick="quickPctChange(${j.id},100)" title="Set to 100% and complete" aria-label="Set ${esc(label)} to 100% and complete">${ic('check')}100%</button>
+        </span>` : ''}
         <div class="act-group" role="group" aria-label="Actions for ${esc(label)}">
           <button type="button" class="act-btn edit" onclick="openEditJob(${j.id})" title="Edit" aria-label="Edit ${esc(label)}">${ic('edit')}<span class="lbl">Edit</span></button>
           <button type="button" class="act-btn reassign" onclick="openReassign(${j.id})" title="Reassign" aria-label="Reassign ${esc(label)}">${ic('reassign')}<span class="lbl">Reassign</span></button>
           <button type="button" class="act-btn shift" onclick="openShiftDate(${j.id})" title="Shift Date" aria-label="Shift target date of ${esc(label)}">${ic('cal-shift')}<span class="lbl">Date</span></button>
           <button type="button" class="act-btn priority" onclick="openPriority(${j.id})" title="Priority" aria-label="Change priority of ${esc(label)}">${ic('flag')}<span class="lbl">Priority</span></button>
           ${ctx}
+          <button type="button" class="act-btn copy" onclick="duplicateJob(${j.id})" title="Copy job" aria-label="Copy ${esc(label)} to a new job">${ic('copy')}<span class="lbl">Copy</span></button>
           <button type="button" class="act-btn share" onclick="openShareJob(${j.id})" title="Share job with another person" aria-label="Share ${esc(label)} with another person">${ic('share')}<span class="lbl">Share</span></button>
           <button type="button" class="act-btn del" onclick="deleteJob(${j.id})" title="Delete" aria-label="Delete ${esc(label)}">${ic('trash')}<span class="lbl">Delete</span></button>
         </div>
@@ -544,13 +634,13 @@ function toggleJobDetails(id, btn) {
   btn.closest('.jrow')?.classList.toggle('expanded', open);
   if(open) {
     _expandedJobs.add(id);
-    _rowSig.set(id, JSON.stringify(j) + '|x');
+    _rowSig.set(id, _jobSig(j));
     panel.querySelector('.jd-inner').innerHTML = jobDetailsHTML(j);
     panel.hidden = false;
     requestAnimationFrame(() => requestAnimationFrame(() => panel.classList.add('open')));
   } else {
     _expandedJobs.delete(id);
-    _rowSig.set(id, JSON.stringify(j));
+    _rowSig.set(id, _jobSig(j));
     panel.classList.remove('open');
     const done = () => { if(!panel.classList.contains('open')) panel.hidden = true; };
     panel.addEventListener('transitionend', done, { once:true });
@@ -584,6 +674,7 @@ function jobDetailsHTML(j) {
   if(j.remark) sections.push(`<div class="jd-section"><h3>${ic('note')}Remark</h3><p>${esc(j.remark)}</p></div>`);
   if(j.sharedJobDetails && j.sharedJobDetails.length) sections.push(`<div class="jd-section"><h3>${ic('share')}Shared with</h3><ul>${j.sharedJobDetails.map(s=>`<li><strong>${esc(s.personName)}</strong> · ${fmtD(s.startDate)} → ${fmtD(s.endDate)}</li>`).join('')}</ul></div>`);
   if(j.reassignmentHistory && j.reassignmentHistory.length) sections.push(`<div class="jd-section"><h3>${ic('reassign')}Reassignment history</h3><ul>${j.reassignmentHistory.map(r=>`<li>${fmtD(r.date)}: <strong>${esc(r.from||'?')}</strong> → <strong>${esc(r.to||'?')}</strong>${r.pctAtHandover!=null?` at ${esc(r.pctAtHandover)}%`:''}${r.reason?` · ${esc(r.reason)}`:''}</li>`).join('')}</ul></div>`);
+  if(Array.isArray(j.activityLog) && j.activityLog.length) sections.push(`<div class="jd-section jd-activity"><h3>${ic('clock')}Activity</h3><ul>${j.activityLog.slice(-10).reverse().map(e=>`<li><time datetime="${esc(e.t)}">${new Date(e.t).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</time> ${activityText(e)}</li>`).join('')}</ul></div>`);
   if(j.reworkHistory && j.reworkHistory.length) sections.push(`<div class="jd-section"><h3>${ic('rework')}Rework history</h3><ul>${j.reworkHistory.map(r=> r.reworkJobId
       ? `<li>Revision ${esc(r.revisionNumber||'?')} created ${fmtD(r.createdDate)} (job #${esc(r.reworkJobId)}) · ${esc(r.personInCharge||'')}</li>`
       : `<li>Reopened from job #${esc(r.originalJobId)} · originally completed ${fmtD(r.completedDate)} by ${esc(r.personInCharge||'?')}${r.actualDays?` in ${esc(r.actualDays)} day(s)`:''}</li>`).join('')}</ul></div>`);
@@ -734,6 +825,107 @@ function setJobTab(tab, btn) {
 
 // ── Optional sorting (default '' keeps v1 order: overdue first, then priority) ──
 let jobSortKey = '', jobSortDir = 'asc';
+
+// ── Quick filter chips (combine with every other filter) ──
+const jobQuick = new Set();
+const _notDone = j => !['complete','cancelled','rework completed'].includes(j.status);
+const QUICK_FILTERS = {
+  week:       j => _notDone(j) && !!j.targetDate && j.targetDate >= today() && j.targetDate <= localDateStr(addDays(new Date(), 7)),
+  overdue:    j => isOverdue(j),
+  high:       j => ['top urgent','urgent'].includes(j.priorityLevel),
+  notstarted: j => ['not planned','planned','rework planned'].includes(j.status) && !(j.completionPercentage > 0),
+};
+function toggleQuickFilter(q, btn) {
+  if(jobQuick.has(q)) jobQuick.delete(q); else jobQuick.add(q);
+  syncQuickChips();
+  renderJobsPage();
+}
+function syncQuickChips() {
+  document.querySelectorAll('#quickChips [data-q]').forEach(b => b.setAttribute('aria-pressed', jobQuick.has(b.dataset.q) ? 'true' : 'false'));
+}
+
+// ── Multi-select ──
+let _selectMode = false;
+const _selectedJobs = new Set();
+function setSelectMode(on) {
+  _selectMode = on;
+  if(!on) _selectedJobs.clear();
+  const wrap = document.getElementById('jobsListWrap'); if(wrap) wrap.dataset.listKey = '';
+  document.getElementById('selectModeBtn')?.setAttribute('aria-pressed', on ? 'true' : 'false');
+  renderJobsPage();
+  updateBulkBar();
+}
+function toggleJobSelect(id, on) {
+  if(on) _selectedJobs.add(id); else _selectedJobs.delete(id);
+  document.getElementById('jcard-'+id)?.classList.toggle('is-selected', on);
+  updateBulkBar();
+}
+function selectAllVisible(on) {
+  const jobs = getFilteredJobs();
+  jobs.forEach(j => on ? _selectedJobs.add(j.id) : _selectedJobs.delete(j.id));
+  const wrap = document.getElementById('jobsListWrap'); if(wrap) wrap.dataset.listKey = '';
+  renderJobsPage(); updateBulkBar();
+}
+function updateBulkBar() {
+  const bar = document.getElementById('bulkBar');
+  if(!bar) return;
+  bar.hidden = !_selectMode;
+  const n = _selectedJobs.size;
+  const c = document.getElementById('bulkCount'); if(c) c.textContent = `${n} selected`;
+  bar.querySelectorAll('[data-needs-sel]').forEach(el => el.disabled = !n);
+}
+// Status names differ for rework jobs; map the simple choice onto the right one
+function statusForJob(j, s) {
+  if(!j.isRework && !isReworkStatus(j.status)) return s;
+  return ({ 'not planned':'rework planned', planned:'rework planned', ongoing:'rework ongoing', complete:'rework completed' })[s] || s;
+}
+// Mark complete without the dialog (bulk): same fields as confirmCompletion()
+function completeJobNow(j, status, dateStr) {
+  j.status = status; j.completionPercentage = 100; j.completionDate = dateStr;
+  if(j.startDate) {
+    let workDays = 0, d = new Date(j.startDate); const end = new Date(dateStr);
+    while(d <= end) { const day = d.getDay(); if(day !== 0 && day !== 6) workDays++; d.setDate(d.getDate()+1); }
+    j.actualDaysToComplete = workDays;
+  }
+}
+function bulkApply(kind, value) {
+  const jobs = JT.jobs.filter(j => _selectedJobs.has(j.id));
+  if(!jobs.length || !value) return;
+  if(kind === 'delete') {
+    if(!confirm(`Delete ${jobs.length} job${jobs.length>1?'s':''}?`)) return;
+    JT.jobs = JT.jobs.filter(j => !_selectedJobs.has(j.id));
+    _selectedJobs.clear();
+  } else jobs.forEach(j => {
+    if(kind === 'status') {
+      const st = statusForJob(j, value);
+      if(st === 'complete' || st === 'rework completed') { if(!['complete','rework completed'].includes(j.status)) completeJobNow(j, st, today()); }
+      else { j.status = st; if((st === 'ongoing' || st === 'rework ongoing') && !j.startDate) j.startDate = today(); }
+    } else if(kind === 'priority') j.priorityLevel = value;
+    else if(kind === 'person' && j.personInCharge !== value) {
+      // Same record as the Reassign dialog
+      if(!j.reassignmentHistory) j.reassignmentHistory = [];
+      j.reassignmentHistory.push({ from: j.personInCharge, to: value, reason: 'Bulk reassign', date: today(), pctAtHandover: j.completionPercentage || 0 });
+      j.personInCharge = value; j.startDate = today();
+      if(!['ongoing','rework ongoing'].includes(j.status)) j.status = isReworkStatus(j.status) ? 'rework planned' : 'planned';
+    }
+  });
+  save(); renderAll(); updateBulkBar();
+  const what = { delete:'deleted', status:`set to "${value}"`, priority:`set to ${value} priority`, person:`assigned to ${value}` }[kind];
+  toastUndo(`${jobs.length} job${jobs.length>1?'s':''} ${what}`);
+  document.querySelectorAll('#bulkBar select').forEach(s => s.value = '');
+}
+
+// ── Copy a job into a new one (opens the Add Job form, pre-filled) ──
+function duplicateJob(id) {
+  const j = JT.jobs.find(x => x.id === id); if(!j) return;
+  openAddJob();
+  document.getElementById('jobModalTitle').textContent = 'Copy Job';
+  const set = (k, v) => { const el = document.getElementById(k); if(el) el.value = v ?? ''; };
+  set('fJobNum', j.jobNumber); set('fClient', j.clientName); set('fVessel', j.vesselName); set('fScope', j.jobScope);
+  set('fTarget', j.targetDate); set('fDays', j.daysRequired || 1); set('fPriority', j.priorityLevel || 'medium');
+  set('fEstManhours', j.estimatedManhours || ''); set('fLoc', j.location || 'HO');
+  setTimeout(() => { set('fPerson', j.personInCharge || ''); autoFillLocation(); }, 60);
+}
 function setJobSort(value) {
   const [k, d] = (value || '').split(':');
   jobSortKey = k || ''; jobSortDir = d || 'asc';
@@ -786,6 +978,7 @@ function getFilteredJobs() {
   if(person) jobs=jobs.filter(j=>j.personInCharge===person);
   if(priority) jobs=jobs.filter(j=>j.priorityLevel===priority);
   if(overdueOnly) jobs=jobs.filter(isOverdue);
+  if(jobQuick.size) jobs=jobs.filter(j=>[...jobQuick].every(q=>QUICK_FILTERS[q]?.(j)));
 
   const prioMap={'top urgent':0,'urgent':1,'medium':2,'low':3};
   jobs.sort((a,b)=>{
@@ -798,6 +991,7 @@ function getFilteredJobs() {
 
 let _jobRenderToken = 0, _jobRenderFlush = null;
 const _rowSig = new Map(); // job id → data signature of the row currently on screen
+const _jobSig = j => JSON.stringify(j) + (_expandedJobs.has(j.id) ? '|x' : '') + (_selectedJobs.has(j.id) ? '|s' : '');
 function renderJobsPage() {
   updateSidebarCounts();
   const jobs = applyJobSort(getFilteredJobs());
@@ -809,10 +1003,10 @@ function renderJobsPage() {
 
   // Same jobs in the same order as on screen (e.g. a % or status change)? Update only the
   // rows that changed, in place: no rebuild, no scroll jump, and progress bars can glide.
-  const listKey = jobs.map(j=>j.id).join(',') + '|' + term + '|' + jobSortKey + ':' + jobSortDir;
+  const listKey = jobs.map(j=>j.id).join(',') + '|' + term + '|' + jobSortKey + ':' + jobSortDir + '|' + (window.jtJobsPlus ? jtJobsPlus.key() : '') + (_selectMode ? '|sel' : '');
   if(jobs.length && wrap.dataset.listKey === listKey && document.getElementById('jobsBody')) {
     jobs.forEach(j => {
-      const sig = JSON.stringify(j) + (_expandedJobs.has(j.id) ? '|x' : '');
+      const sig = _jobSig(j);
       if(_rowSig.get(j.id) === sig) return;
       const el = document.getElementById('jcard-' + j.id);
       if(!el) return;                       // not rendered yet: the progressive renderer will draw it fresh
@@ -847,7 +1041,8 @@ function renderJobsPage() {
 
   // Progressive rendering: first rows immediately, the rest in small batches
   const FIRST = 40, CHUNK = 120;
-  const card = j => { _rowSig.set(j.id, JSON.stringify(j) + (_expandedJobs.has(j.id) ? '|x' : '')); return renderJobCard(j, term); };
+  const card = j => { _rowSig.set(j.id, _jobSig(j)); return renderJobCard(j, term); };
+  if(window.jtJobsPlus && jtJobsPlus.render(wrap, jobs, term, head, card)) return;
   wrap.innerHTML = `<h2 class="sr-only">Job list</h2>` + head + `<div class="jobs-body" id="jobsBody">${jobs.slice(0, FIRST).map(card).join('')}</div>`;
   let i = FIRST;
   const body = document.getElementById('jobsBody');
@@ -887,14 +1082,27 @@ function updateFilterCount() {
 // - compensationWorkingDays[name][] = specific person works this day (overrides all off rules)
 // Job occupies exactly daysRequired WORKING days starting from plannedStartDate/startDate
 
+// Visible range: one week (as v1), two weeks, or a calendar month. planWeekOffset counts
+// weeks in week views and months in the month view.
+let planRange = (() => { try { const r = localStorage.getItem('jt_plan_range'); return ['week','2week','month'].includes(r) ? r : 'week'; } catch(e) { return 'week'; } })();
+function setPlanRange(r) {
+  planRange = r; planWeekOffset = 0;
+  try { localStorage.setItem('jt_plan_range', r); } catch(e) {}
+  renderPlanning();
+}
 function getPlanDates() {
   const t = new Date(); t.setHours(0,0,0,0);
+  if(planRange === 'month') {
+    const first = new Date(t.getFullYear(), t.getMonth() + planWeekOffset, 1);
+    const n = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    return Array.from({ length: n }, (_, i) => new Date(first.getFullYear(), first.getMonth(), i + 1));
+  }
   const dayOfWeek = t.getDay();
   const monday = new Date(t);
   monday.setDate(t.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1) + (planWeekOffset * 7));
   monday.setHours(0,0,0,0);
   const dates = [];
-  for(let i = 0; i < 7; i++) {
+  for(let i = 0, n = planRange === '2week' ? 14 : 7; i < n; i++) {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
     dates.push(d);
@@ -902,7 +1110,7 @@ function getPlanDates() {
   return dates;
 }
 
-function planShift(n) { planWeekOffset += n; renderPlanning(); }
+function planShift(n) { planWeekOffset += n * (planRange === '2week' ? 2 : 1); renderPlanning(); }
 function planToday() { planWeekOffset = 0; renderPlanning(); }
 
 // Is this date a working day for this person?
@@ -1161,8 +1369,16 @@ function renderPlanning() {
   const personF = document.getElementById('planPersonFilter')?.value || '';
   const t = today();
 
-  document.getElementById('planLabel').textContent =
-    `${dates[0].toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} — ${dates[6].toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`;
+  const last = dates[dates.length - 1];
+  document.getElementById('planLabel').textContent = planRange === 'month'
+    ? dates[0].toLocaleDateString('en-GB',{month:'long',year:'numeric'})
+    : `${dates[0].toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} — ${last.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})}`;
+  const unit = planRange === 'month' ? 'month' : planRange === '2week' ? '2 weeks' : 'week';
+  document.querySelectorAll('[data-plan-prev]').forEach(b => b.setAttribute('aria-label', 'Previous ' + unit));
+  document.querySelectorAll('[data-plan-next]').forEach(b => b.setAttribute('aria-label', 'Next ' + unit));
+  document.querySelectorAll('[data-plan-range]').forEach(b => { const on = b.dataset.planRange === planRange; b.classList.toggle('active', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+  document.getElementById('planTable').className = 'plan-table plan-' + planRange;
+  document.getElementById('planTable').style.setProperty('--plan-cols', dates.length);
 
   const persons = JT.persons.filter(p =>
     (!locF || p.location === locF) &&
@@ -1177,7 +1393,7 @@ function renderPlanning() {
   }
 
   // ── HEADER ROW ──
-  let html = `<colgroup><col class="pc-col-person"><col span="7"></colgroup><thead><tr>
+  let html = `<colgroup><col class="pc-col-person"><col span="${dates.length}"></colgroup><thead><tr>
     <th scope="col" class="pt-corner">Schedule</th>`;
 
   dates.forEach(d => {
@@ -1214,6 +1430,10 @@ function renderPlanning() {
       isOverdue(j)
     ).length;
 
+    // How booked is this person in the visible range? (working days with at least one job)
+    let workDays = 0, bookedDays = 0;
+    dates.forEach(d => { const ds = localDateStr(d); if(isWorkingDayForPerson(ds, person.name)) { workDays++; if(getJobsForPersonOnDate(person.name, ds).length) bookedDays++; } });
+    const util = workDays ? Math.round(bookedDays / workDays * 100) : 0;
     html += `<tr>
       <th scope="row" class="plan-person-cell">
         <div class="plan-person-inner">
@@ -1222,6 +1442,7 @@ function renderPlanning() {
             <span class="pp-tag loc-${esc(person.location)}">${esc(person.location)}</span>
             ${overdueCount>0?`<span class="pp-tag over" title="${overdueCount} overdue">⚠ ${overdueCount}</span>`:''}
           </div>
+          <div class="pp-util" title="Booked ${bookedDays} of ${workDays} working days in this view"><span class="pp-util-bar"><span style="--pct:${util}%"></span></span><span>${util}%</span></div>
         </div>
       </th>`;
 
@@ -1242,7 +1463,8 @@ function renderPlanning() {
       const jobsOnDay = getJobsForPersonOnDate(person.name, ds);
       const cellLabel = `${person.name}, ${d.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'})}: ${!isPersonWorking ? (dayTypeForPerson==='holiday'?'holiday':dayTypeForPerson==='person-holiday'?'on leave':'off') : jobsOnDay.length ? jobsOnDay.length+' job'+(jobsOnDay.length>1?'s':'') : 'free'}. Set day status`;
 
-      html += `<td class="pc ${cellCls}" onclick="handleDayCellClick(event,'${ds}',${jsArg(person.name)})" tabindex="0" data-kbd-click aria-label="${esc(cellLabel)}">`;
+      const cap = !isPersonWorking ? '' : jobsOnDay.length === 0 ? ' cap-free' : jobsOnDay.length === 1 ? ' cap-booked' : ' cap-over';
+      html += `<td class="pc ${cellCls}${cap}" data-ds="${ds}" data-person="${esc(person.name)}" onclick="handleDayCellClick(event,'${ds}',${jsArg(person.name)})" tabindex="0" data-kbd-click aria-label="${esc(cellLabel)}${jobsOnDay.length>1?' (overbooked)':''}">`;
 
       if(!isPersonWorking) {
         if(dayTypeForPerson==='holiday')
@@ -1260,7 +1482,7 @@ function renderPlanning() {
         const scope = j.jobScope || '', vessel = j.vesselName || '';
 
         if(j._isUpcoming) {
-          html += `<div class="plan-chip upcoming" role="button" tabindex="0"
+          html += `<div class="plan-chip upcoming" data-up="${j.id}" data-from="${ds}" role="button" tabindex="0"
             onclick="event.stopPropagation();openUpcomingChipPopup(event,${j.id})"
             title="UPCOMING · ${esc(vessel)} · ${esc(scope)}" aria-label="Upcoming: ${esc(vessel)}, ${esc(scope)}, day ${dayNum} of ${totalDays}">
             <div class="chip-t">${esc(scope.substring(0,14))}${scope.length>14?'…':''}</div>
@@ -1269,7 +1491,7 @@ function renderPlanning() {
           </div>`;
         } else {
           const notPlanned = j.status==='not planned';
-          html += `<div class="plan-chip" role="button" tabindex="0"
+          html += `<div class="plan-chip" data-job="${j.id}" data-from="${ds}" data-own="${j.personInCharge===person.name?1:0}" role="button" tabindex="0"
             onclick="event.stopPropagation();openJobChipPopup(event,${j.id})"
             style="background:${chipColor};color:${readableTextOn(chipColor)};box-shadow:0 1px 3px rgba(0,0,0,.15)${isLastDay?',inset -3px 0 0 rgba(255,255,255,.25)':''}"
             title="${esc(vessel)} · ${esc(scope)} · ${pct}% (D${dayNum}/${totalDays})" aria-label="${esc(vessel)}, ${esc(scope)}, ${j.status}, ${pct}% complete, day ${dayNum} of ${totalDays}${isOverdue(j)?', overdue':''}. Open job">
@@ -1572,9 +1794,22 @@ function renderPersons() {
     grid.innerHTML = emptyState('persons', 'No team members yet', 'Add the people who work on jobs to assign work and plan their schedule.', `<button type="button" class="btn btn-primary" onclick="openAddPerson()">${ic('plus')}Add Person</button>`);
     return;
   }
+  const t = today(), in30 = localDateStr(addDays(new Date(), 30));
+  // Next two weeks of working days, to show how booked each person is
+  const days = []; for(let i = 0; i < 14; i++) days.push(localDateStr(addDays(new Date(), i)));
+  clearJobDateCache();
   grid.innerHTML=JT.persons.map((p,i)=>{
     const active=JT.jobs.filter(j=>j.personInCharge===p.name&&['ongoing','planned','rework ongoing','rework planned'].includes(j.status)).length;
     const total=JT.jobs.filter(j=>j.personInCharge===p.name).length;
+    const open=JT.jobs.filter(j=>j.personInCharge===p.name&&!['complete','rework completed','cancelled'].includes(j.status));
+    const done=JT.jobs.filter(j=>j.personInCharge===p.name&&['complete','rework completed'].includes(j.status)).length;
+    const over=open.filter(isOverdue).length;
+    const leave=(JT.personHolidays?.[p.name]||[]).filter(d=>d>=t&&d<=in30).sort();
+    const work=days.filter(d=>isWorkingDayForPerson(d,p.name));
+    const booked=work.filter(d=>getJobsForPersonOnDate(p.name,d).some(j=>!j._isUpcoming)).length;
+    const busy=work.length?Math.round(booked/work.length*100):0;
+    const level=busy>=85?'full':busy>=40?'busy':'free';
+    const levelText={full:'Fully booked',busy:'Partly booked',free:'Mostly free'}[level];
     return `<article class="person-card" aria-label="${esc(p.name)}">
       <div class="person-top">
         <div class="person-avatar" style="--av:${colors[i%colors.length]}" aria-hidden="true">${esc(initials(p.name))}</div>
@@ -1585,8 +1820,16 @@ function renderPersons() {
       </div>
       <div class="person-stats">
         <span class="person-stat ${active?'is-active':''}">${active} active</span>
+        <span class="person-stat">${open.length} open</span>
+        <span class="person-stat">${done} done</span>
+        ${over?`<span class="person-stat is-over">${over} overdue</span>`:''}
         <span class="person-stat">${total} total</span>
       </div>
+      <div class="person-load">
+        <div class="person-load-top"><span>Next 2 weeks: <strong class="load-${level}">${levelText}</strong></span><span class="tnum">${booked}/${work.length} days</span></div>
+        <div class="bar" role="progressbar" aria-label="Booked working days in the next 2 weeks" aria-valuenow="${busy}" aria-valuemin="0" aria-valuemax="100"><span style="--pct:${busy}%;--c:var(--load-${level})"></span></div>
+      </div>
+      <div class="person-leave">${ic('calendar')}${leave.length?`Leave: ${leave.slice(0,3).map(fmtD).join(', ')}${leave.length>3?` +${leave.length-3} more`:''}`:'No leave in the next 30 days'}</div>
       <div class="person-actions">
         <button type="button" class="act-btn edit" onclick="openEditPerson(${p.id})" aria-label="Edit ${esc(p.name)}">${ic('edit')}<span class="lbl">Edit</span></button>
         <button type="button" class="act-btn del" onclick="deletePerson(${p.id})" aria-label="Remove ${esc(p.name)}">${ic('trash')}<span class="lbl">Remove</span></button>
@@ -1599,6 +1842,8 @@ function renderPersons() {
 function populatePersonDropdowns() {
   const opts=`<option value="">— Unassigned —</option>`+JT.persons.map(p=>`<option value="${p.name}">${p.name} (${p.location})</option>`).join('');
   ['fPerson','fQcBy','fuPerson','rAssignPerson','rwPerson','qcBySelect','sharePerson'].forEach(id=>{const e=document.getElementById(id);if(e)e.innerHTML=opts;});
+  const bp=document.getElementById('bulkPerson');
+  if(bp) bp.innerHTML=`<option value="">Assign to…</option>`+JT.persons.map(p=>`<option value="${esc(p.name)}">${esc(p.name)} (${esc(p.location)})</option>`).join('');
   const pf=document.getElementById('jobPersonFilter');
   if(pf) pf.innerHTML=`<option value="">All Persons</option>`+JT.persons.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
 }
@@ -1656,6 +1901,7 @@ function openAddJob() {
   handleInvoiceTypeChange();
   handleStatusChange();
   populatePersonDropdowns();
+  autoFillLocation();
   const _ms=document.getElementById('multiScopeSection');
   if(_ms){_ms.style.display='block';document.getElementById('multiScopeList').innerHTML='';}
   openModal('jobModal');
@@ -1698,7 +1944,7 @@ function openEditJob(id) {
   document.getElementById('fRevision').value=j.revisionNumber||'';
   handleStatusChange();
   populatePersonDropdowns();
-  setTimeout(()=>{document.getElementById('fPerson').value=j.personInCharge||'';document.getElementById('fQcBy').value=j.qcDoneBy||'';},50);
+  setTimeout(()=>{document.getElementById('fPerson').value=j.personInCharge||'';document.getElementById('fQcBy').value=j.qcDoneBy||'';autoFillLocation();},50);
   openModal('jobModal');
 }
 
@@ -1763,8 +2009,8 @@ function saveJob() {
   if(editJobId){
     const idx=JT.jobs.findIndex(j=>j.id===editJobId);
     if(idx>=0) JT.jobs[idx]={...JT.jobs[idx],...d};
-    showToast('Job updated','ok');
     save();closeModal('jobModal');renderAll();
+    toastUndo('Job updated');
   } else {
     // Primary job
     d.id=nextId(); JT.jobs.unshift(d);
@@ -1805,7 +2051,7 @@ function saveJob() {
 
 function deleteJob(id){
   if(!confirm('Delete this job?'))return;
-  JT.jobs=JT.jobs.filter(j=>j.id!==id);save();renderAll();showToast('Job deleted');
+  JT.jobs=JT.jobs.filter(j=>j.id!==id);save();renderAll();toastUndo('Job deleted');
 }
 
 // ===== ACTION MODALS =====
@@ -1831,7 +2077,7 @@ function doReassign(){
   if(!['ongoing','rework ongoing'].includes(j.status)) j.status='planned';
   save();closeModal('reassignModal');
   setTimeout(()=>renderAll(),30);
-  showToast(`Reassigned to ${newPerson||'?'} (${pctAtHandover}% done by ${prev||'?'})`,'ok');
+  toastUndo(`Reassigned to ${newPerson||'?'} (${pctAtHandover}% done by ${prev||'?'})`);
 }
 
 function openShiftDate(id){
@@ -1846,7 +2092,7 @@ function doShiftDate(){
   const j=JT.jobs.find(x=>x.id===actionJobId);if(!j)return;
   const nd=document.getElementById('shiftDate').value;
   if(!nd){showToast('Please select a date','err');return;}
-  j.targetDate=nd;save();closeModal('shiftModal');renderAll();showToast('Target date updated','ok');
+  j.targetDate=nd;save();closeModal('shiftModal');renderAll();toastUndo('Target date updated');
 }
 
 function openPriority(id){
@@ -1858,7 +2104,7 @@ function openPriority(id){
 function doPriority(){
   const j=JT.jobs.find(x=>x.id===actionJobId);if(!j)return;
   j.priorityLevel=document.getElementById('newPriority').value;
-  save();closeModal('priorityModal');renderAll();showToast('Priority updated','ok');
+  save();closeModal('priorityModal');renderAll();toastUndo('Priority updated');
 }
 
 function isHoldActive(j){
@@ -1928,7 +2174,7 @@ function doExtendHold(){
 function resumeJob(id){
   const j=JT.jobs.find(x=>x.id===id);if(!j)return;
   j.status=j.isRework?'rework ongoing':'ongoing';j.holdStartDate=null;
-  save();renderAll();showToast('Job resumed','ok');
+  save();renderAll();toastUndo('Job resumed');
 }
 
 // ===== PERSONS =====
@@ -1961,6 +2207,7 @@ function openAddUpcoming(){
   document.getElementById('fuPriority').value='medium';
   document.getElementById('upcomingModalTitle').textContent='Add Upcoming Job';
   populatePersonDropdowns();
+  lockLocationToPerson('fuPerson','fuLoc');
   openModal('upcomingModal');
 }
 function openEditUpcoming(id){
@@ -1974,7 +2221,7 @@ function openEditUpcoming(id){
   sv('fuDays',j.daysRequired||1); sv('fuLoc',j.location||'HO');
   sv('fuPriority',j.priorityLevel||'medium'); sv('fuNotes',j.notes);
   populatePersonDropdowns();
-  setTimeout(()=>sv('fuPerson',j.personInCharge),60);
+  setTimeout(()=>{sv('fuPerson',j.personInCharge);lockLocationToPerson('fuPerson','fuLoc');},60);
   openModal('upcomingModal');
 }
 
@@ -2034,10 +2281,10 @@ function quickPctChange(jobId, val) {
       }
     }
     save(); renderJobsPage(); renderPlanning();
-    showToast(`${j.jobNumber||'Job'}: ${pct}%`,'ok');
+    toastUndo(`${j.jobNumber||'Job'}: ${pct}%`);
   } else {
     save(); renderJobsPage(); renderPlanning();
-    showToast(`${j.jobNumber||'Job'}: ${pct}%`,'ok');
+    toastUndo(`${j.jobNumber||'Job'}: ${pct}%`);
   }
 }
 
@@ -2359,10 +2606,11 @@ async function exportExcel(type) {
   // ══════════════════════════════════════════════════
   // ── SHEET: ALL JOBS / ACTIVE JOBS ──
   // ══════════════════════════════════════════════════
-  if(type==='all'||type==='active') {
+  if(type==='all'||type==='active'||type==='view') {
     const jobs = type==='all' ? JT.jobs
+      : type==='view' ? applyJobSort(getFilteredJobs())
       : JT.jobs.filter(j=>['ongoing','planned','rework ongoing','rework planned'].includes(j.status));
-    const ws = wb.addWorksheet(type==='all'?'All Jobs':'Active Jobs');
+    const ws = wb.addWorksheet(type==='all'?'All Jobs':type==='view'?'Jobs (current view)':'Active Jobs');
     const cols = [
       {id:'jobnum',   label:'Job #',            w:10, val:j=>j.jobNumber||''},
       {id:'client',   label:'Client',            w:20, val:j=>j.clientName||''},
@@ -2608,7 +2856,7 @@ function quickStatusChange(id, newStatus) {
   if(newStatus==='ongoing' && !j.startDate) j.startDate = today();
   save();
   setTimeout(()=>renderAll(), 30);
-  showToast(`Status updated to "${newStatus}"`, 'ok');
+  toastUndo(`Status updated to "${newStatus}"`);
 }
 
 
@@ -2619,6 +2867,7 @@ function updateClearBtn() {
     (document.getElementById('jobPersonFilter')?.value || '') !== '' ||
     (document.getElementById('jobPriorityFilter')?.value || '') !== '' ||
     !!document.getElementById('jobOverdueOnly')?.checked ||
+    jobQuick.size > 0 ||
     currentSideFilter !== 'all' ||
     currentSideLocFilter !== '' ||
     (typeof jobTab !== 'undefined' && jobTab !== 'all');
@@ -2634,6 +2883,7 @@ function clearJobFilters() {
   });
   const ov = document.getElementById('jobOverdueOnly');
   if(ov) ov.checked = false;
+  jobQuick.clear(); syncQuickChips();
 
   // Reset all state variables
   currentSideFilter = 'all';
@@ -2735,7 +2985,7 @@ function confirmCompletion() {
   closeModal('completionDateModal');
   if(typeof _completionCallback === 'function') _completionCallback();
   setTimeout(() => renderAll(), 30);
-  showToast('Job marked complete — ' + completionDate, 'ok');
+  toastUndo('Job marked complete — ' + completionDate);
 }
 
 
@@ -2869,7 +3119,7 @@ function msSyncLoc(sel) {
   const row = sel.closest('.ms-row');
   if(!row) return;
   const person = JT.persons.find(p=>p.name===sel.value);
-  if(person) { const loc = row.querySelector('.ms-loc'); if(loc) loc.value=person.location; }
+  lockLocationToPerson(sel, row.querySelector('.ms-loc'));
 }
 
 function handleInvoiceTypeChange() {
@@ -3194,10 +3444,17 @@ D${dayNum}/${total} · ${pct}%`);
 
 // ===================== AUTO-FILL LOCATION FROM PERSON =====================
 function autoFillLocation() {
-  const personName = document.getElementById('fPerson').value;
-  if(!personName) return;
-  const person = JT.persons.find(p=>p.name===personName);
-  if(person) document.getElementById('fLoc').value = person.location;
+  lockLocationToPerson('fPerson', 'fLoc');
+}
+// Location follows the person in charge: fill it in and lock the field while a person is chosen
+function lockLocationToPerson(personSel, locSel) {
+  const ps = typeof personSel === 'string' ? document.getElementById(personSel) : personSel;
+  const ls = typeof locSel === 'string' ? document.getElementById(locSel) : locSel;
+  if(!ps || !ls) return;
+  const loc = personLocation(ps.value);
+  if(loc) ls.value = loc;
+  ls.disabled = !!loc;
+  ls.title = loc ? 'Set automatically from the person in charge' : '';
 }
 
 // ===================== REPORTS =====================
