@@ -2182,3 +2182,4 @@ kbd { font-family: var(--font); font-size: 11px; font-weight: 700; padding: 2px 
 @media (max-width: 767px) { .palette-foot { display: none; } .palette-overlay { padding-top: var(--s4); } }
 .modal.palette { border-radius: var(--rx); }
 html.is-dragging .toast, html.is-dragging .chart-tip { pointer-events: none; }
+.view-switch .seg-btn { min-height: 40px; }

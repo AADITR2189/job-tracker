@@ -278,6 +278,10 @@
   <div class="sec-hdr">
     <div><h1 id="h-jobs">All Jobs</h1><p id="jobsSubtitle" aria-live="polite"></p></div>
     <div class="sec-hdr-right">
+      <div class="seg seg-strong view-switch" role="group" aria-label="Show jobs as">
+        <button type="button" class="seg-btn active" id="viewListBtn" onclick="jtJobsPlus.setView('list')" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#i-list"/></svg>List</button>
+        <button type="button" class="seg-btn" id="viewBoardBtn" onclick="jtJobsPlus.setView('board')" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-board"/></svg>Board</button>
+      </div>
       <button type="button" class="btn btn-primary" onclick="openAddJob()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add Job</button>
     </div>
   </div>
@@ -349,10 +353,6 @@
       <button type="button" class="qchip" data-q="notstarted" aria-pressed="false" onclick="toggleQuickFilter('notstarted',this)"><svg class="ic" aria-hidden="true"><use href="#i-hourglass"/></svg>Not started</button>
     </div>
     <div class="view-tools">
-      <div class="seg" role="group" aria-label="Layout">
-        <button type="button" class="seg-btn icon-only active" id="viewListBtn" onclick="jtJobsPlus.setView('list')" aria-pressed="true" title="List view"><svg class="ic" aria-hidden="true"><use href="#i-list"/></svg><span class="sr-only">List view</span></button>
-        <button type="button" class="seg-btn icon-only" id="viewBoardBtn" onclick="jtJobsPlus.setView('board')" aria-pressed="false" title="Board view"><svg class="ic" aria-hidden="true"><use href="#i-board"/></svg><span class="sr-only">Board view</span></button>
-      </div>
       <label class="sr-only" for="jobGroup">Group jobs</label>
       <select class="form-ctrl compact" id="jobGroup" onchange="jtJobsPlus.setGroup(this.value)" title="Group jobs">
         <option value="">No grouping</option>

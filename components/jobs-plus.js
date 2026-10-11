@@ -12,7 +12,8 @@
   const KEY = 'jt_jobs_view';
   let st = { view: 'list', group: '', density: 'comfortable' };
   try { Object.assign(st, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch(e) {}
-  const store = () => { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch(e) {} };
+  st.view = 'list';   // the Jobs page always opens as the usual list; Board is only shown when chosen
+  const store = () => { try { const { view, ...keep } = st; localStorage.setItem(KEY, JSON.stringify(keep)); } catch(e) {} };
   const toggled = new Set();          // groups opened/closed by the user
   const colLimit = {};                // board: how many cards each column shows
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
