@@ -1697,7 +1697,7 @@ html:not(.app-ready) #page-dashboard > .section-card { visibility: hidden; anima
   .jc-target { grid-template-columns: 1fr auto; grid-template-rows: auto auto; gap: 4px var(--s2); }
   .jc-target .jrow-date { grid-column: 1 / -1; }
   .jc-target .jrow-date small { display: none; }
-  .jc-actions { padding-top: 0; border-top: none; justify-content: flex-end; }
+  .jc-actions { grid-column: 2 / -1; padding-top: 0; border-top: none; justify-content: flex-start; }
   .status-select { flex: 0 0 170px; min-height: 40px; font-size: .9375rem; }
   .pct-form input { min-height: 40px; width: 64px; font-size: .9375rem; }
   .act-btn, .act-btn.btn-sm { min-height: 40px; min-width: 40px; padding: 0 8px; }
@@ -1734,12 +1734,21 @@ html:not(.app-ready) #page-dashboard > .section-card { visibility: hidden; anima
   :root[data-theme="dark"] .rpt-total > td { background: #0B1222; }
 }
 
-/* Wide desktop: actions inline on the same row */
-@media (min-width: 1500px) {
-  :root { --job-cols: 40px 108px minmax(150px, 1.2fr) minmax(170px, 1.8fr) 136px 128px 104px 140px minmax(470px, auto); }
-  .jobs-head .jh-actions { display: block; text-align: right; }
-  .jrow-main { grid-template-areas: "expand num vessel scope person status priority target actions"; }
-  .jc-actions { flex-wrap: nowrap; }
+/* Wide desktop: the job's action buttons stay on one horizontal row under its details */
+@media (min-width: 1280px) {
+  .jc-actions, .jc-actions .act-group { flex-wrap: nowrap; }
+}
+/* Small laptops (1024–1279px): tighter columns; priority shows under the status instead of its own column */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  :root { --job-cols: 32px 84px minmax(96px, 1.1fr) minmax(96px, 1.4fr) 96px 108px 0px 96px; }
+  .jobs-head, .jrow-main { column-gap: 6px; }
+  .jobs-head [onclick="sortByColumn('priority')"], .jc-priority { visibility: hidden; overflow: hidden; width: 0; padding: 0; }
+  .jc-status .st-prio { display: inline-flex; }
+}
+.st-prio { display: none; }
+@media (min-width: 1280px) and (max-width: 1499px) {
+  :root { --job-cols: 32px 96px minmax(110px, 1.2fr) minmax(120px, 1.5fr) 112px 116px 96px 104px; }
+  .jobs-head, .jrow-main { column-gap: 8px; }
 }
 
 /* Large screens */
