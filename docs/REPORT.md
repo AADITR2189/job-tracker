@@ -144,3 +144,9 @@ Browser notes: Android Chrome, Samsung Internet, Windows Chrome/Edge and macOS C
 - **Colour scheme (v2.2, "Soft White, Sage & Olive"):** light: background `#E8E9DF`, cards `#FAFAF6`, primary/buttons deep olive `#2E3D28` (11.6:1 with white), accent sage `#A9B887`, text `#1F2A1C`, muted `#5B6656`. Dark: background `#141912`, surface `#20281D`, buttons `#4A5F3F`, accent sage `#A9B887`, text `#F3F5EE`, muted `#AEB89C`. Status colours (red overdue, green ongoing, amber rework, purple hold) are unchanged so states stay recognisable. 0 axe-core violations in both themes.
 - **Theme:** System / Light / Dark. Applied before first paint (no flash), remembered, follows the OS live in System mode, with a smooth transition when switching.
 - **Motion:** 150 / 250 / 400ms; transform/opacity-based. Page fade-up with staggered reveal, skeleton shimmer, card lift, button ripple and press, expanding job rows, fade + scale dialogs, sliding nav indicator, toast slide-in/fade-out, animated counters, progress bars and completion ring.
+
+## v2.4 update: location follows the assigned person
+
+At the user's request, a job's location now always equals the location of its person in charge (jobs without a person, or whose person is no longer in the list, keep their own location). This is the only change to stored data. `tests/compat.test.js` now feeds v1 the same backup with this one rule applied and requires every other calculation, filter, planning slot, report total, export and import to match v1 exactly, and checks that no field other than `location` is ever changed on open. On the real 900-job backup, 165 jobs had a location different from their person's; all other checks are identical to v1.
+
+Accessibility (axe-core 4.10.2, light/dark, desktop/phone, 16 screens incl. board, bulk select, grouped list, month planning, compare, quick search): 0 violations. Lighthouse 12.2.1: mobile performance 90–93, desktop 100; accessibility 100, SEO 100.

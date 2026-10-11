@@ -16,6 +16,20 @@ const file = process.argv[2] || path.join(__dirname, 'fixtures/sample-backup-v1.
 const raw = fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '');
 const input = JSON.parse(raw);
 
+// v2.4 rule (requested by the user): a job's location follows its assigned person.
+// v1 is fed the same data with that one rule applied, so every other calculation
+// must still match exactly. Nothing but "location" may differ from the original.
+const withPersonLocations = d => {
+  const c = JSON.parse(JSON.stringify(d));
+  const map = new Map((c.persons || []).map(p => [p.name, p.location]));
+  [c.jobs, c.upcomingJobs].forEach(list => (list || []).forEach(j => {
+    const l = j && j.personInCharge ? map.get(j.personInCharge) : null;
+    if(l && j.location !== l) j.location = l;
+  }));
+  return c;
+};
+const expected = withPersonLocations(input);
+
 let failures = 0;
 const check = (name, a, b) => {
   const ok = JSON.stringify(a) === JSON.stringify(b);
@@ -92,9 +106,9 @@ const captureExport = async () => {
 
 (async () => {
   const browser = await chromium.launch();
-  const load = async (url) => {
+  const load = async (url, seed = input) => {
     const ctx = await browser.newContext({ serviceWorkers: 'block' });
-    await ctx.addInitScript(d => { if(!sessionStorage.getItem('seeded')) { localStorage.setItem('jt_v2', d); sessionStorage.setItem('seeded','1'); } }, JSON.stringify(input));
+    await ctx.addInitScript(d => { if(!sessionStorage.getItem('seeded')) { localStorage.setItem('jt_v2', d); sessionStorage.setItem('seeded','1'); } }, JSON.stringify(seed));
     const page = await ctx.newPage();
     const errs = []; page.on('pageerror', e => errs.push(e.message));
     page.on('dialog', d => d.accept());
@@ -103,7 +117,7 @@ const captureExport = async () => {
     await page.waitForTimeout(300);
     return { ctx, page, errs };
   };
-  const v1 = await load('legacy/index-v1.html');
+  const v1 = await load('legacy/index-v1.html', expected);
   const v2 = await load('index.html');
 
   let r1 = null;
@@ -116,9 +130,13 @@ const captureExport = async () => {
   if(r1) for(const k of Object.keys(r1)) check('calc: ' + k, r1[k], r2[k]);
   else { check('v2 runs every calculation on this data', !!r2 && r2.tabs.all.length === input.jobs.length, true); await browser.close(); console.log(failures ? `\n${failures} difference(s) found` : '\nAll v2 checks passed (v1 comparison not possible)'); process.exit(failures ? 1 : 0); }
 
-  // Stored data must be untouched by simply opening the app
+  // Opening the app changes nothing except locations that disagreed with the assigned person
   const stored2 = await v2.page.evaluate(() => JSON.parse(localStorage.getItem('jt_v2')));
-  check('localStorage jt_v2 unchanged after opening v2', input.jobs, stored2.jobs);
+  check('localStorage jt_v2 unchanged after opening v2 (apart from location rule)', expected.jobs, stored2.jobs);
+  const changedFields = new Set();
+  input.jobs.forEach((j, i) => Object.keys({ ...j, ...stored2.jobs[i] }).forEach(k => { if(JSON.stringify(j[k]) !== JSON.stringify(stored2.jobs[i][k])) changedFields.add(k); }));
+  check('only the "location" field is ever changed on open', [...changedFields].filter(k => k !== 'location'), []);
+  console.log(`ℹ locations corrected to match the assigned person: ${input.jobs.filter((j, i) => j.location !== stored2.jobs[i].location).length} job(s)`);
 
   // Export output: identical shape and content (except timestamp)
   const e1 = JSON.parse(await v1.page.evaluate(captureExport));
@@ -127,8 +145,8 @@ const captureExport = async () => {
   check('export: same top-level keys in same order', Object.keys(e1), Object.keys(e2));
   delete e1.exportDate; delete e2.exportDate;
   check('export: identical content (v1 vs v2)', e1, e2);
-  const inCopy = { ...input }; delete inCopy.exportDate;
-  check('export: round-trips the original backup exactly', inCopy, e2);
+  const inCopy = { ...expected }; delete inCopy.exportDate;
+  check('export: round-trips the original backup exactly (apart from location rule)', inCopy, e2);
   check('export: same JSON formatting (2-space indent)', /^\{\n  "jobs": \[/.test(e2text), true);
 
   // Import: v2 importing the file produces the same stored data as v1 importing it
@@ -141,7 +159,7 @@ const captureExport = async () => {
   };
   const i1 = await doImport(v1.page);
   const i2 = await doImport(v2.page);
-  check('import: stored result identical to v1 import', i1, i2);
+  check('import: stored result identical to v1 import (apart from location rule)', withPersonLocations(i1), i2);
   const meta = await v2.page.evaluate(() => jtGetPreImportMeta());
   check('import: safety copy kept before import', !!meta, true);
 

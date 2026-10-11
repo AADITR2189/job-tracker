@@ -14,9 +14,10 @@
      download the new files.
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION = 'v2.3.1';
+const CACHE_VERSION = 'v2.4.0';
 const SHELL_CACHE = `jt-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = 'jt-runtime-v1';
+const NOTIFY_CACHE = 'jt-notify';   // small "jobs due" summary written by the page (no job data beyond names)
 
 const SHELL_ASSETS = [
   './',
@@ -30,6 +31,11 @@ const SHELL_ASSETS = [
   'components/pwa.js',
   'components/sync.js',
   'components/motion.js',
+  'components/drag.js',
+  'components/jobs-plus.js',
+  'components/planning-plus.js',
+  'components/insights.js',
+  'components/palette.js',
   'sync-config.js',
   'manifest.json',
   'icons/favicon.svg',
@@ -67,7 +73,7 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
-    const keep = [SHELL_CACHE, RUNTIME_CACHE];
+    const keep = [SHELL_CACHE, RUNTIME_CACHE, NOTIFY_CACHE];
     const names = await caches.keys();
     await Promise.all(names.filter(n => !keep.includes(n)).map(n => caches.delete(n)));
     if(self.registration.navigationPreload) { try { await self.registration.navigationPreload.disable(); } catch(e) {} }
@@ -84,6 +90,39 @@ self.addEventListener('message', event => {
 // Periodic Background Sync (Chromium, installed apps): check for a newer version.
 self.addEventListener('periodicsync', event => {
   if(event.tag === 'jt-update-check') event.waitUntil(self.registration.update());
+  if(event.tag === 'jt-due-check') event.waitUntil(dueReminder());
+});
+
+// Background reminder: uses the summary the page saved, at most once a day.
+async function dueReminder() {
+  const c = await caches.open(NOTIFY_CACHE);
+  const res = await c.match('due.json');
+  if(!res) return;
+  const d = await res.json();
+  const now = new Date();
+  const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+  const shown = await c.match('shown.txt');
+  if(shown && (await shown.text()) === todayStr) return;
+  // The summary was made on d.date; if a day has passed, "tomorrow" is now "today"
+  const stale = d.date !== todayStr;
+  const lines = [];
+  if(!stale && d.today) lines.push(`Due today (${d.today}): ${d.todayNames.join(', ')}`);
+  if(d.tomorrow) lines.push(`Due ${stale ? 'today' : 'tomorrow'} (${d.tomorrow}): ${d.tomorrowNames.join(', ')}`);
+  if(!lines.length) return;
+  await self.registration.showNotification('Job Tracker: jobs due soon', { body: lines.join('\n'), tag: 'jt-due', icon: 'icons/icon-192.png', badge: 'icons/favicon-32.png', data: { url: './?page=jobs' } });
+  await c.put('shown.txt', new Response(todayStr));
+}
+
+// Tapping a reminder opens (or focuses) the app on the Jobs page
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = new URL((event.notification.data && event.notification.data.url) || './', self.registration.scope).href;
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const w = wins.find(c => c.url.startsWith(self.registration.scope));
+    if(w) { await w.focus(); try { await w.navigate(url); } catch(e) {} return; }
+    await self.clients.openWindow(url);
+  })());
 });
 
 async function cacheFirst(request, cacheName) {

@@ -122,6 +122,16 @@
     <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c.93 0 1.5-.75 1.5-1.5 0-.39-.15-.74-.39-1.01a1.5 1.5 0 0 1 1.12-2.49H16a6 6 0 0 0 6-6c0-4.97-4.48-9-10-9z"/></symbol>
     <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></symbol>
+    <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+    <symbol id="i-rows" viewBox="0 0 24 24"><path d="M3 5h18M3 10h18M3 15h18M3 20h18"/></symbol>
+    <symbol id="i-check-square" viewBox="0 0 24 24"><path d="m9 11 3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/></symbol>
+    <symbol id="i-group" viewBox="0 0 24 24"><path d="M3 4h18v6H3zM3 14h18v6H3z"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1"/><circle cx="15" cy="6" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="18" r="1"/><circle cx="15" cy="18" r="1"/></symbol>
   </defs>
 </svg>
 
@@ -211,6 +221,7 @@
       <button type="button" class="btn btn-ghost hide-md" onclick="triggerImport()"><svg class="ic" aria-hidden="true"><use href="#i-import"/></svg>Import</button>
       <button type="button" class="btn btn-ghost hide-md" onclick="exportData()" title="Export all data as JSON backup"><svg class="ic" aria-hidden="true"><use href="#i-export"/></svg>Export JSON</button>
       <button type="button" class="btn btn-secondary hide-md" onclick="showExportMenu()" title="Export to Excel"><svg class="ic" aria-hidden="true"><use href="#i-table"/></svg>Excel</button>
+      <button type="button" class="icon-btn" id="searchBtn" onclick="jtPalette.open()" aria-label="Search jobs (Ctrl+K)" title="Search (Ctrl+K)" aria-keyshortcuts="Control+K"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></button>
       <button type="button" class="icon-btn" id="themeToggle" onclick="toggleTheme()" aria-label="Switch to dark theme"><svg class="ic theme-ic-light" aria-hidden="true"><use href="#i-moon"/></svg><svg class="ic theme-ic-dark" aria-hidden="true"><use href="#i-sun"/></svg></button>
       <button type="button" class="btn btn-primary" onclick="openAddJob()" aria-label="Add job"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg><span class="hide-xs">Add Job</span></button>
       <input type="file" id="fileImport" accept=".json,application/json" style="display:none" onchange="doImport(event)" aria-hidden="true" tabindex="-1">
@@ -224,6 +235,11 @@
   <div class="sec-hdr">
     <div><h1 id="h-dashboard">Dashboard</h1><p id="dashDate">Day-wise job tracking and planning</p></div>
     <div class="sec-hdr-right">
+      <div class="seg" role="group" aria-label="Show dashboard for location">
+        <button type="button" class="seg-btn active" id="dashLocAll" onclick="setDashAvailLoc('')" aria-pressed="true">All</button>
+        <button type="button" class="seg-btn" id="dashLocHO" onclick="setDashAvailLoc('HO')" aria-pressed="false">HO</button>
+        <button type="button" class="seg-btn" id="dashLocCOK" onclick="setDashAvailLoc('COK')" aria-pressed="false">COK</button>
+      </div>
       <button type="button" class="btn btn-primary" onclick="openAddJob()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add Job</button>
     </div>
   </div>
@@ -234,6 +250,10 @@
   </div>
   <div class="dash-grid" id="dashInsights">
     <div class="skeleton sk-panel"></div><div class="skeleton sk-panel"></div>
+  </div>
+  <div class="dash-more" id="dashMore">
+    <div class="skeleton sk-week"></div>
+    <div class="dash-grid"><div class="skeleton sk-chart"></div><div class="skeleton sk-chart"></div></div>
   </div>
   <div id="dashAlert" class="alert-box" style="display:none">
     <div class="ai" aria-hidden="true"><svg class="ic"><use href="#i-alert"/></svg></div>
@@ -258,6 +278,10 @@
   <div class="sec-hdr">
     <div><h1 id="h-jobs">All Jobs</h1><p id="jobsSubtitle" aria-live="polite"></p></div>
     <div class="sec-hdr-right">
+      <div class="seg seg-strong view-switch" role="group" aria-label="Show jobs as">
+        <button type="button" class="seg-btn active" id="viewListBtn" onclick="jtJobsPlus.setView('list')" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#i-list"/></svg>List</button>
+        <button type="button" class="seg-btn" id="viewBoardBtn" onclick="jtJobsPlus.setView('board')" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-board"/></svg>Board</button>
+      </div>
       <button type="button" class="btn btn-primary" onclick="openAddJob()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add Job</button>
     </div>
   </div>
@@ -321,19 +345,60 @@
       <button type="button" id="clearFiltersBtn" class="btn btn-warn-soft" onclick="clearJobFilters()" title="Clear all active filters" style="display:none"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg>Clear filters</button>
     </div>
   </div>
+  <div class="jobs-toolbar">
+    <div class="quick-chips" id="quickChips" role="group" aria-label="Quick filters">
+      <button type="button" class="qchip" data-q="week" aria-pressed="false" onclick="toggleQuickFilter('week',this)"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg>Due this week</button>
+      <button type="button" class="qchip qchip-danger" data-q="overdue" aria-pressed="false" onclick="toggleQuickFilter('overdue',this)"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Overdue</button>
+      <button type="button" class="qchip" data-q="high" aria-pressed="false" onclick="toggleQuickFilter('high',this)"><svg class="ic" aria-hidden="true"><use href="#i-flag"/></svg>High priority</button>
+      <button type="button" class="qchip" data-q="notstarted" aria-pressed="false" onclick="toggleQuickFilter('notstarted',this)"><svg class="ic" aria-hidden="true"><use href="#i-hourglass"/></svg>Not started</button>
+    </div>
+    <div class="view-tools">
+      <label class="sr-only" for="jobGroup">Group jobs</label>
+      <select class="form-ctrl compact" id="jobGroup" onchange="jtJobsPlus.setGroup(this.value)" title="Group jobs">
+        <option value="">No grouping</option>
+        <option value="jobnum">Group by job #</option>
+        <option value="vessel">Group by vessel</option>
+      </select>
+      <button type="button" class="icon-btn bordered" id="densityBtn" onclick="jtJobsPlus.toggleDensity()" aria-pressed="false" title="Compact view"><svg class="ic" aria-hidden="true"><use href="#i-rows"/></svg><span class="sr-only">Compact view</span></button>
+      <button type="button" class="icon-btn bordered" id="selectModeBtn" onclick="setSelectMode(!_selectMode)" aria-pressed="false" title="Select jobs"><svg class="ic" aria-hidden="true"><use href="#i-check-square"/></svg><span class="sr-only">Select jobs</span></button>
+      <button type="button" class="icon-btn bordered" onclick="exportExcel('view')" title="Export these jobs to Excel"><svg class="ic" aria-hidden="true"><use href="#i-table"/></svg><span class="sr-only">Export these jobs to Excel</span></button>
+    </div>
+  </div>
+  <div class="bulk-bar" id="bulkBar" role="region" aria-label="Selected jobs" hidden>
+    <strong id="bulkCount">0 selected</strong>
+    <button type="button" class="btn btn-sm" onclick="selectAllVisible(true)">Select all</button>
+    <button type="button" class="btn btn-sm" onclick="selectAllVisible(false)" data-needs-sel>Clear</button>
+    <label class="sr-only" for="bulkStatus">Set status</label>
+    <select class="form-ctrl compact" id="bulkStatus" onchange="bulkApply('status',this.value)" data-needs-sel>
+      <option value="">Set status…</option><option value="not planned">Not planned</option><option value="planned">Planned</option><option value="ongoing">Ongoing</option><option value="hold">Hold</option><option value="complete">Complete (today)</option><option value="cancelled">Cancelled</option>
+    </select>
+    <label class="sr-only" for="bulkPriority">Set priority</label>
+    <select class="form-ctrl compact" id="bulkPriority" onchange="bulkApply('priority',this.value)" data-needs-sel>
+      <option value="">Set priority…</option><option value="top urgent">Top urgent</option><option value="urgent">Urgent</option><option value="medium">Medium</option><option value="low">Low</option>
+    </select>
+    <label class="sr-only" for="bulkPerson">Assign to</label>
+    <select class="form-ctrl compact" id="bulkPerson" onchange="bulkApply('person',this.value)" data-needs-sel></select>
+    <button type="button" class="btn btn-sm btn-danger-soft" onclick="bulkApply('delete',true)" data-needs-sel><svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button>
+    <button type="button" class="btn btn-sm btn-primary" onclick="setSelectMode(false)">Done</button>
+  </div>
   <div id="jobsListWrap" class="jobs-list"></div>
 </section>
 
 <!-- ===================== PLANNING ===================== -->
 <section id="page-planning" class="page" aria-labelledby="h-planning">
   <div class="sec-hdr">
-    <div><h1 id="h-planning">Planning</h1><p>Day-wise schedule per person. Select a day to set holidays, leave or working days.</p></div>
+    <div><h1 id="h-planning">Planning</h1><p>Day-wise schedule per person. Select a day to set holidays, leave or working days. Drag a job to reschedule or reassign it.</p></div>
   </div>
   <div class="toolbar plan-nav">
     <div class="seg seg-strong" role="group" aria-label="Change week">
-      <button type="button" class="seg-btn icon-only" onclick="planShift(-1)" aria-label="Previous week"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
+      <button type="button" class="seg-btn icon-only" onclick="planShift(-1)" data-plan-prev aria-label="Previous week"><svg class="ic" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
       <button type="button" class="seg-btn" onclick="planToday()">Today</button>
-      <button type="button" class="seg-btn icon-only" onclick="planShift(1)" aria-label="Next week"><svg class="ic" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+      <button type="button" class="seg-btn icon-only" onclick="planShift(1)" data-plan-next aria-label="Next week"><svg class="ic" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+    </div>
+    <div class="seg" role="group" aria-label="How much to show">
+      <button type="button" class="seg-btn active" data-plan-range="week" onclick="setPlanRange('week')" aria-pressed="true">Week</button>
+      <button type="button" class="seg-btn" data-plan-range="2week" onclick="setPlanRange('2week')" aria-pressed="false">2 weeks</button>
+      <button type="button" class="seg-btn" data-plan-range="month" onclick="setPlanRange('month')" aria-pressed="false">Month</button>
     </div>
     <span id="planLabel" class="plan-week-label" aria-live="polite"></span>
     <div class="toolbar-right">
@@ -368,6 +433,10 @@
     <span class="lg"><i class="lg-sw lg-overdue"></i>Overdue</span>
     <span class="lg"><i class="lg-sw lg-rework"></i>Rework</span>
     <span class="lg"><i class="lg-sw lg-upcoming"></i>Upcoming</span>
+    <span class="lg"><i class="lg-cap cap-free"></i>Free</span>
+    <span class="lg"><i class="lg-cap cap-booked"></i>Booked</span>
+    <span class="lg"><i class="lg-cap cap-over"></i>Overbooked (2+ jobs)</span>
+    <span class="lg lg-hint">Drag a job to another day or person to move it</span>
   </div>
   <div class="section-card flush">
     <div class="plan-wrap" tabindex="0" role="region" aria-label="Weekly schedule (scroll horizontally on small screens)"><table class="plan-table" id="planTable"></table></div>
@@ -441,6 +510,15 @@
       </div>
     </div>
     <div class="settings-card span-2">
+      <h2 class="settings-title"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg>Reminders</h2>
+      <p class="settings-desc">Each time you open the app it shows how many jobs are due today and overdue. You can also get a phone or computer notification about jobs due today and tomorrow.</p>
+      <p class="settings-meta" id="notifyInfo"></p>
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" id="notifyBtn" onclick="jtPalette.toggleNotify()"><svg class="ic" aria-hidden="true"><use href="#i-bell"/></svg>Turn on notifications</button>
+        <button type="button" class="btn" id="notifyTestBtn" onclick="jtPalette.testNotify()" hidden>Send a test notification</button>
+      </div>
+    </div>
+    <div class="settings-card span-2">
       <h2 class="settings-title"><svg class="ic" aria-hidden="true"><use href="#i-database"/></svg>JSON Format Reference</h2>
       <pre class="schema-box" tabindex="0" aria-label="JSON backup format">{
   "jobs": [{
@@ -451,7 +529,8 @@
     "actualDaysToComplete", "completionDate", "holdStartDate", "holdDays",
     "qcDone", "qcDoneBy", "reworkHistory", "reworkCycles",
     "reassignmentHistory", "sharedWith", "sharedJobDetails", "remark",
-    "parentJobId", "revisionNumber", "isRework"
+    "parentJobId", "revisionNumber", "isRework",
+    "activityLog" (optional, added in v2.4: [{ "t", "f", "a", "b" }])
   }],
   "persons": [{ "id", "name", "location", "position", "created_at", "updated_at" }],
   "upcomingJobs": [{ "id", "jobNumber", "clientName", "vesselName", "jobScope",
@@ -473,6 +552,7 @@
   <div class="sec-hdr">
     <div><h1 id="h-reports">Reports</h1><p>Financial &amp; manhour analysis by person or by vessel/job</p></div>
     <div class="sec-hdr-right">
+      <button type="button" class="btn" onclick="jtInsights.printReport()" title="Save this report as a PDF or print it"><svg class="ic" aria-hidden="true"><use href="#i-printer"/></svg>PDF / Print</button>
       <button type="button" class="btn" onclick="exportReportCSV()" title="Export current view as CSV"><svg class="ic" aria-hidden="true"><use href="#i-export"/></svg>CSV</button>
       <button type="button" class="btn btn-primary" onclick="exportReportExcel()" title="Export current view as Excel"><svg class="ic" aria-hidden="true"><use href="#i-table"/></svg>Excel</button>
     </div>
@@ -481,6 +561,7 @@
     <div class="seg seg-strong" role="group" aria-label="Report grouping">
       <button type="button" class="seg-btn active" id="rptTabPerson" onclick="setRptTab('person')" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg>By Person</button>
       <button type="button" class="seg-btn" id="rptTabVessel" onclick="setRptTab('vessel')" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-anchor"/></svg>By Vessel / Job</button>
+      <button type="button" class="seg-btn" id="rptTabCompare" onclick="setRptTab('compare')" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-compare"/></svg>Compare</button>
     </div>
     <div class="date-range" role="group" aria-label="Date range">
       <label class="sr-only" for="rptFrom">From date</label>
@@ -497,6 +578,8 @@
     </div>
     <label class="check-chip"><input type="checkbox" id="rptIncludeRework" onchange="renderReports()" checked><span>Include reworks</span></label>
   </div>
+  <div class="print-hdr" id="rptPrintHdr" aria-hidden="true"></div>
+  <div id="rptCharts"></div>
   <div id="rptContent"></div>
 </section>
 
@@ -524,7 +607,7 @@
     <div class="modal-body">
       <div class="form-grid">
         <div class="form-group fl"><input class="form-ctrl" id="fJobNum" placeholder=" " autocomplete="off"><label class="form-label" for="fJobNum">Job Number</label><span class="form-hint">e.g. DN14682</span></div>
-        <div class="form-group"><label class="form-label" for="fLoc">Location</label><select class="form-ctrl" id="fLoc"><option value="HO">HO</option><option value="COK">COK</option></select></div>
+        <div class="form-group"><label class="form-label" for="fLoc">Location</label><select class="form-ctrl" id="fLoc" aria-describedby="fLocHint"><option value="HO">HO</option><option value="COK">COK</option></select><span class="form-hint" id="fLocHint">Follows the person in charge</span></div>
         <div class="form-group fl"><input class="form-ctrl" id="fClient" placeholder=" " autocomplete="off"><label class="form-label" for="fClient">Client Name</label></div>
         <div class="form-group fl"><input class="form-ctrl" id="fVessel" placeholder=" " autocomplete="off" required data-error="Vessel name is required"><label class="form-label" for="fVessel">Vessel Name <span class="req" aria-hidden="true">*</span></label></div>
         <div class="form-group fl full"><input class="form-ctrl" id="fScope" placeholder=" " autocomplete="off"><label class="form-label" for="fScope">Job Scope</label><span class="form-hint">Primary scope</span></div>
@@ -689,8 +772,8 @@
         <div class="form-group fl"><input class="form-ctrl" id="fuScope" placeholder=" " autocomplete="off"><label class="form-label" for="fuScope">Job Scope</label></div>
         <div class="form-group"><label class="form-label" for="fuTarget">Target Date</label><input class="form-ctrl" type="date" id="fuTarget"></div>
         <div class="form-group fl"><input class="form-ctrl" type="number" inputmode="numeric" id="fuDays" min="1" value="1" placeholder=" " data-error="Enter at least 1 day"><label class="form-label" for="fuDays">Days Required</label></div>
-        <div class="form-group"><label class="form-label" for="fuPerson">Person In Charge</label><select class="form-ctrl" id="fuPerson"></select></div>
-        <div class="form-group"><label class="form-label" for="fuLoc">Location</label><select class="form-ctrl" id="fuLoc"><option value="HO">HO</option><option value="COK">COK</option></select></div>
+        <div class="form-group"><label class="form-label" for="fuPerson">Person In Charge</label><select class="form-ctrl" id="fuPerson" onchange="lockLocationToPerson('fuPerson','fuLoc')"></select></div>
+        <div class="form-group"><label class="form-label" for="fuLoc">Location</label><select class="form-ctrl" id="fuLoc" aria-describedby="fuLocHint"><option value="HO">HO</option><option value="COK">COK</option></select><span class="form-hint" id="fuLocHint">Follows the person in charge</span></div>
         <div class="form-group"><label class="form-label" for="fuPriority">Priority</label><select class="form-ctrl" id="fuPriority">
           <option value="top urgent">Top Urgent</option><option value="urgent">Urgent</option>
           <option value="medium">Medium</option><option value="low">Low</option>
@@ -862,6 +945,20 @@
   </div>
 </div>
 
+<!-- Quick search (Ctrl+K) -->
+<div class="overlay hidden palette-overlay" id="paletteModal">
+  <div class="modal palette" role="dialog" aria-modal="true" aria-label="Quick search">
+    <div class="palette-input">
+      <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+      <input type="text" id="paletteInput" placeholder="Search jobs, vessels, people, pages…" autocomplete="off" spellcheck="false"
+        role="combobox" aria-expanded="true" aria-controls="paletteList" aria-autocomplete="list" aria-label="Search">
+      <kbd>Esc</kbd>
+    </div>
+    <div class="modal-body palette-body" tabindex="0" aria-label="Search results"><ul id="paletteList" role="listbox" aria-label="Results"></ul></div>
+    <div class="palette-foot" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Ctrl</kbd>+<kbd>K</kbd> anywhere</span></div>
+  </div>
+</div>
+
 <!-- Export Menu Modal -->
 <div class="overlay hidden" id="exportMenuModal">
   <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="exportMenuTitle">
@@ -872,6 +969,7 @@
     <div class="modal-body">
       <p class="form-note">Choose what to export. Each option downloads an <strong>.xlsx</strong> file you can open in Excel or Google Sheets.</p>
       <div class="ds-list">
+        <button type="button" class="ds-btn" onclick="exportExcel('view')"><svg class="ic" aria-hidden="true"><use href="#i-filter"/></svg><span><strong>Jobs as filtered</strong><small>Only the jobs shown on the Jobs page right now</small></span></button>
         <button type="button" class="ds-btn" onclick="exportExcel('all')"><svg class="ic" aria-hidden="true"><use href="#i-briefcase"/></svg><span><strong>All Jobs</strong><small>Every job in the system</small></span></button>
         <button type="button" class="ds-btn" onclick="exportExcel('active')"><svg class="ic" aria-hidden="true"><use href="#i-zap"/></svg><span><strong>Active Jobs</strong><small>Ongoing + planned only</small></span></button>
         <button type="button" class="ds-btn" onclick="exportExcel('overdue')"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg><span><strong>Overdue Jobs</strong><small>Past target date</small></span></button>

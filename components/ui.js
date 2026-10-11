@@ -22,13 +22,15 @@ function announce(msg, assertive) {
 }
 
 /* ───────────── Toasts ───────────── */
-function showToast(msg, type = '') {
+// opts: { action: 'Undo', onAction: fn } adds a button to the toast (and keeps it up a little longer)
+function showToast(msg, type = '', opts) {
   const wrap = document.getElementById('toastWrap');
   if(!wrap) return;
   const t = document.createElement('div');
   t.className = `toast ${type}`;
   const ic = type === 'ok' ? 'check' : type === 'err' ? 'alert' : 'info';
   t.innerHTML = `<span class="toast-ic">${_icon(ic)}</span><span class="toast-msg"></span>
+    ${opts && opts.action ? '<button type="button" class="toast-action"></button>' : ''}
     <button type="button" class="toast-close" aria-label="Dismiss notification">${_icon('x')}</button>`;
   t.querySelector('.toast-msg').textContent = msg;
   wrap.appendChild(t);
@@ -40,10 +42,17 @@ function showToast(msg, type = '') {
     t.classList.add('leaving');
     setTimeout(() => t.remove(), prefersReducedMotion() ? 0 : 260);
   };
+  if(opts && opts.action) {
+    const b = t.querySelector('.toast-action');
+    b.textContent = opts.action;
+    b.addEventListener('click', () => { remove(); if(typeof opts.onAction === 'function') opts.onAction(); }, { once: true });
+  }
   t.querySelector('.toast-close').addEventListener('click', remove);
-  let timer = setTimeout(remove, type === 'err' ? 5500 : 3000);
+  const life = type === 'err' ? 5500 : (opts && opts.action ? 6000 : 3000);
+  let timer = setTimeout(remove, life);
   t.addEventListener('pointerenter', () => clearTimeout(timer));
-  t.addEventListener('pointerleave', () => { timer = setTimeout(remove, 1800); });
+  t.addEventListener('pointerleave', () => { timer = setTimeout(remove, 2400); });
+  t.addEventListener('focusin', () => clearTimeout(timer));
 }
 
 /* ───────────── Dialogs (all .overlay elements) ───────────── */

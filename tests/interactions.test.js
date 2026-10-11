@@ -83,7 +83,7 @@ let fail = 0; const ok = (n, c, extra) => { console.log(c ? '✓' : '✗', n, ex
     await xctx.addInitScript(d => localStorage.setItem('jt_v2', d), data);
     const xp = await xctx.newPage(); xp.on('pageerror', e => errs.push(e.message));
     await xp.goto(BASE); await xp.waitForTimeout(500);
-    for(const [type, re] of [['all', /^job-tracker-all-.*\.xlsx$/], ['overdue', /\.xlsx$/], ['complete', /\.xlsx$/], ['persons', /\.xlsx$/], ['planning', /^Planning_All_Next2Weeks_.*\.xlsx$/]]) {
+    for(const [type, re] of [['all', /^job-tracker-all-.*\.xlsx$/], ['overdue', /\.xlsx$/], ['complete', /\.xlsx$/], ['persons', /\.xlsx$/], ['planning', /^Planning_All_Next2Weeks_.*\.xlsx$/], ['view', /^job-tracker-view-.*\.xlsx$/]]) {
       const dl = xp.waitForEvent('download', { timeout: 20000 }).catch(() => null);
       await xp.evaluate(t => exportExcel(t), type);
       const d = await dl; ok(`Excel export "${type}" downloads`, !!d && re.test(d.suggestedFilename()), d && d.suggestedFilename());
