@@ -238,17 +238,31 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 // A JS string literal that is safe inside an HTML attribute, e.g. onclick="fn(${jsArg(name)})"
 const jsArg = s => esc(JSON.stringify(String(s ?? '')));
 const ic = name => `<svg class="ic" aria-hidden="true"><use href="#i-${name}"/></svg>`;
-// Escape text and wrap matches of the current search term in <mark>
+// Split a search into several terms: "DF1670, DN14791; Maersk" → 3 terms.
+// Without commas, a list of job numbers pasted with spaces/new lines ("DF1670 DN14791") also splits;
+// any other text ("damage stability") stays one phrase, as before.
+const JOBNUM_RE = /^[a-z]{1,5}-?\d{2,}[a-z0-9-]*$/i;
+function searchTerms(raw) {
+  const q = String(raw || '').toLowerCase().trim();
+  if(!q) return [];
+  if(/[,;\n]/.test(q)) return [...new Set(q.split(/[,;\n]+/).map(t => t.trim()).filter(Boolean))];
+  const words = q.split(/\s+/);
+  if(words.length > 1 && words.every(w => JOBNUM_RE.test(w))) return [...new Set(words)];
+  return [q];
+}
+// Escape text and wrap matches of the current search term(s) in <mark>
 function hl(text, term) {
   const s = String(text ?? '');
-  if(!term) return esc(s);
+  const terms = searchTerms(term);
+  if(!terms.length) return esc(s);
   const lower = s.toLowerCase();
-  let out = '', i = 0, idx;
-  while((idx = lower.indexOf(term, i)) !== -1) {
-    out += esc(s.slice(i, idx)) + '<mark>' + esc(s.slice(idx, idx + term.length)) + '</mark>';
-    i = idx + term.length;
-  }
-  return out + esc(s.slice(i));
+  const marks = [];   // [start, end] of every match, any term
+  terms.forEach(t => { let i = 0, idx; while((idx = lower.indexOf(t, i)) !== -1) { marks.push([idx, idx + t.length]); i = idx + t.length; } });
+  if(!marks.length) return esc(s);
+  marks.sort((a, b) => a[0] - b[0] || b[1] - a[1]);
+  let out = '', pos = 0;
+  marks.forEach(([a, b]) => { if(a < pos) a = pos; if(b <= a) return; out += esc(s.slice(pos, a)) + '<mark>' + esc(s.slice(a, b)) + '</mark>'; pos = b; });
+  return out + esc(s.slice(pos));
 }
 const isPageActive = name => !!document.getElementById('page-'+name)?.classList.contains('active');
 const PAGE_TITLES = { dashboard:'Dashboard', jobs:'Jobs', planning:'Planning', upcoming:'Upcoming', persons:'Persons', settings:'Settings & Data', reports:'Reports' };
@@ -997,7 +1011,12 @@ function getFilteredJobs() {
   else if(jobTab==='overdue') jobs=jobs.filter(isOverdue);
   else if(jobTab!=='all') jobs=jobs.filter(j=>j.status===jobTab);
 
-  if(search) jobs=jobs.filter(j=>(j.jobNumber+j.vesselName+j.clientName+j.jobScope+(j.personInCharge||'')).toLowerCase().includes(search));
+  if(search) {
+    // Several searches at once (comma-separated, or pasted job numbers) show jobs matching ANY of them;
+    // a single search works exactly as before.
+    const terms = searchTerms(search);
+    jobs=jobs.filter(j=>{ const h=(j.jobNumber+j.vesselName+j.clientName+j.jobScope+(j.personInCharge||'')).toLowerCase(); return terms.some(t=>h.includes(t)); });
+  }
   if(loc) jobs=jobs.filter(j=>j.location===loc);
   if(person) jobs=jobs.filter(j=>j.personInCharge===person);
   if(priority) jobs=jobs.filter(j=>j.priorityLevel===priority);
@@ -1019,7 +1038,8 @@ const _jobSig = j => JSON.stringify(j) + (_expandedJobs.has(j.id) ? '|x' : '') +
 function renderJobsPage() {
   updateSidebarCounts();
   const jobs = applyJobSort(getFilteredJobs());
-  document.getElementById('jobsSubtitle').textContent = `${jobs.length} job${jobs.length!==1?'s':''} found`;
+  const nTerms = searchTerms(document.getElementById('jobSearch')?.value).length;
+  document.getElementById('jobsSubtitle').textContent = `${jobs.length} job${jobs.length!==1?'s':''} found${nTerms>1?` for ${nTerms} searches`:''}`;
   if(typeof updateClearBtn==='function') updateClearBtn();
   updateFilterCount();
   const wrap = document.getElementById('jobsListWrap');

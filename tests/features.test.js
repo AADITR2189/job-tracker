@@ -257,6 +257,31 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
   await p.waitForTimeout(500);
   ok('Enter opens the job on the Jobs page', await p.evaluate(() => isPageActive('jobs') && document.getElementById('paletteModal').classList.contains('hidden')));
 
+  /* ── Multi search & group by client ── */
+  const ms = await p.evaluate(async () => {
+    showPage('jobs'); clearJobFilters();
+    const s = document.getElementById('jobSearch');
+    const nums = [...new Set(JT.jobs.map(j => j.jobNumber).filter(Boolean))].slice(0, 3);
+    const client = JT.jobs.find(j => j.clientName && !nums.includes(j.jobNumber)).clientName;
+    const want = q => JT.jobs.filter(j => (j.jobNumber + j.vesselName + j.clientName + j.jobScope + (j.personInCharge || '')).toLowerCase().includes(q.toLowerCase())).map(j => j.id);
+    const union = [...new Set([...nums.flatMap(want), ...want(client)])].sort((a, b) => a - b);
+    s.value = nums.join(', ') + ', ' + client; renderJobsPage();
+    const got = getFilteredJobs().map(j => j.id).sort((a, b) => a - b);
+    const marks = document.querySelectorAll('#jobsBody mark').length;
+    const sub = document.getElementById('jobsSubtitle').textContent;
+    s.value = nums.join(' '); renderJobsPage();
+    const spaced = getFilteredJobs().length === [...new Set(nums.flatMap(want))].length;
+    s.value = ''; renderJobsPage();
+    jtJobsPlus.setGroup('client');
+    const groups = document.querySelectorAll('.jgroup').length;
+    const clients = new Set(JT.jobs.map(j => ((j.clientName || '').trim() || '(no client)').replace(/\s+/g, ' ').toLowerCase())).size;
+    jtJobsPlus.setGroup('');
+    return { equal: JSON.stringify(got) === JSON.stringify(union), n: got.length, marks, sub, spaced, groups, clients };
+  });
+  ok('search with commas shows jobs matching any of the terms (highlighted)', ms.equal && ms.n > 0 && ms.marks > 0 && /for 4 searches/.test(ms.sub), ms);
+  ok('pasted job numbers separated by spaces also search for each', ms.spaced, ms);
+  ok('group by client: one group per client', ms.groups === ms.clients, ms);
+
   /* ── Typing a % and pressing Enter saves once (one Undo, and Undo restores the old value) ── */
   await p.evaluate(() => { clearJobFilters(); setJobTab('ongoing'); document.getElementById('toastWrap').innerHTML = ''; });
   await p.waitForTimeout(300);
