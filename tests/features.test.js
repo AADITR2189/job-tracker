@@ -13,7 +13,8 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
   const b = await chromium.launch();
   const mk = async (opts = {}, seed = data) => {
     const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block', ...opts });
-    await ctx.addInitScript(d => { if(!sessionStorage.seeded) { localStorage.setItem('jt_v2', d); sessionStorage.seeded = 1; } }, seed);
+    // jt_reminded: skip the "due today" reminder toast so it can't be mistaken for an Undo toast
+    await ctx.addInitScript(d => { if(!sessionStorage.seeded) { localStorage.setItem('jt_v2', d); sessionStorage.seeded = 1; sessionStorage.setItem('jt_reminded', '1'); } }, seed);
     const p = await ctx.newPage(); p.errs = [];
     p.on('pageerror', e => p.errs.push(e.message)); p.on('dialog', d => d.accept());
     await p.goto(BASE);
@@ -110,10 +111,21 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
     const ho = JT.persons.find(x => x.location === 'HO');
     bulkApply('person', ho.name);
     const ps = ids.every(id => { const j = JT.jobs.find(x => x.id === id); return j.personInCharge === ho.name && j.location === 'HO'; });
+    // Job number / vessel / client for all selected; empty box keeps the old value
+    const clients = ids.map(id => JT.jobs.find(j => j.id === id).clientName);
+    openBulkEdit();
+    const hint = document.getElementById('beVesselNow').textContent;
+    document.getElementById('beJobNum').value = 'NEW-123';
+    document.getElementById('beVessel').value = 'New Vessel';
+    saveBulkEdit();
+    const txt = ids.every((id, i) => { const j = JT.jobs.find(x => x.id === id); return j.jobNumber === 'NEW-123' && j.vesselName === 'New Vessel' && j.clientName === clients[i]; });
+    const closed = document.getElementById('bulkEditModal').classList.contains('hidden');
+    const savedTxt = JSON.parse(localStorage.getItem('jt_v2')).jobs.filter(j => ids.includes(j.id)).every(j => j.jobNumber === 'NEW-123');
     setSelectMode(false);
-    return { count, pr, ps, barHidden: document.getElementById('bulkBar').hidden };
+    return { count, pr, ps, txt, closed, savedTxt, hint, barHidden: document.getElementById('bulkBar').hidden };
   });
   ok('bulk select: priority and person applied to 3 jobs (location follows)', bulk.count === '3 selected' && bulk.pr && bulk.ps && bulk.barHidden, bulk);
+  ok('bulk edit: job number and vessel changed on all 3, client kept, saved', bulk.txt && bulk.closed && bulk.savedTxt && /^Now:/.test(bulk.hint), bulk);
 
   /* ── Copy ── */
   const copy = await p.evaluate(() => {

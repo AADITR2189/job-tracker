@@ -915,6 +915,30 @@ function bulkApply(kind, value) {
   document.querySelectorAll('#bulkBar select').forEach(s => s.value = '');
 }
 
+// ── Bulk edit of job number / vessel / client for the selected jobs ──
+const BULK_TEXT = [['beJobNum','jobNumber','Job #'], ['beVessel','vesselName','Vessel'], ['beClient','clientName','Client']];
+function openBulkEdit() {
+  const jobs = JT.jobs.filter(j => _selectedJobs.has(j.id));
+  if(!jobs.length) return;
+  document.getElementById('bulkEditTitle').textContent = `Update ${jobs.length} selected job${jobs.length>1?'s':''}`;
+  BULK_TEXT.forEach(([id, field]) => {
+    document.getElementById(id).value = '';
+    const vals = [...new Set(jobs.map(j => (j[field] || '').trim()))];
+    document.getElementById(id + 'Now').textContent = vals.length === 1
+      ? `Now: ${vals[0] || '(empty)'}`
+      : `Now: ${vals.length} different values (${vals.slice(0, 3).map(v => v || '(empty)').join(', ')}${vals.length > 3 ? '…' : ''})`;
+  });
+  openModal('bulkEditModal');
+}
+function saveBulkEdit() {
+  const jobs = JT.jobs.filter(j => _selectedJobs.has(j.id));
+  const changes = BULK_TEXT.map(([id, field, label]) => ({ field, label, value: document.getElementById(id).value.trim() })).filter(c => c.value);
+  if(!changes.length) { showToast('Type at least one new value, or press Cancel', 'err'); return; }
+  jobs.forEach(j => changes.forEach(c => { j[c.field] = c.value; }));
+  save(); closeModal('bulkEditModal'); renderAll(); updateBulkBar();
+  toastUndo(`${jobs.length} job${jobs.length>1?'s':''} updated: ${changes.map(c => `${c.label} → ${c.value}`).join(', ')}`);
+}
+
 // ── Copy a job into a new one (opens the Add Job form, pre-filled) ──
 function duplicateJob(id) {
   const j = JT.jobs.find(x => x.id === id); if(!j) return;
