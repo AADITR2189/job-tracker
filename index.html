@@ -301,7 +301,7 @@
     <div class="search-field">
       <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
       <label class="sr-only" for="jobSearch">Search jobs</label>
-      <input type="search" id="jobSearch" placeholder="Search job #, vessel, client, scope, person…" autocomplete="off" enterkeyhint="search" oninput="renderJobsPage();updateClearBtn()">
+      <input type="search" id="jobSearch" placeholder="Search job #, vessel, client… (several: DF1670, DN14791)" title="Separate several searches with commas to see all of them together" autocomplete="off" enterkeyhint="search" oninput="renderJobsPage();updateClearBtn()">
     </div>
     <button type="button" class="btn filter-toggle" id="filterToggle" onclick="toggleFilterPanel()" aria-expanded="false" aria-controls="filterPanel"><svg class="ic" aria-hidden="true"><use href="#i-filter"/></svg>Filters<span class="filter-count" id="filterCount" hidden></span></button>
     <div class="filter-panel" id="filterPanel">
@@ -358,6 +358,7 @@
         <option value="">No grouping</option>
         <option value="jobnum">Group by job #</option>
         <option value="vessel">Group by vessel</option>
+        <option value="client">Group by client</option>
       </select>
       <button type="button" class="icon-btn bordered" id="densityBtn" onclick="jtJobsPlus.toggleDensity()" aria-pressed="false" title="Compact view"><svg class="ic" aria-hidden="true"><use href="#i-rows"/></svg><span class="sr-only">Compact view</span></button>
       <button type="button" class="icon-btn bordered" id="selectModeBtn" onclick="setSelectMode(!_selectMode)" aria-pressed="false" title="Select jobs"><svg class="ic" aria-hidden="true"><use href="#i-check-square"/></svg><span class="sr-only">Select jobs</span></button>
@@ -378,6 +379,7 @@
     </select>
     <label class="sr-only" for="bulkPerson">Assign to</label>
     <select class="form-ctrl compact" id="bulkPerson" onchange="bulkApply('person',this.value)" data-needs-sel></select>
+    <button type="button" class="btn btn-sm" onclick="openBulkEdit()" data-needs-sel><svg class="ic" aria-hidden="true"><use href="#i-edit"/></svg>Job # / Vessel / Client</button>
     <button type="button" class="btn btn-sm btn-danger-soft" onclick="bulkApply('delete',true)" data-needs-sel><svg class="ic" aria-hidden="true"><use href="#i-trash"/></svg>Delete</button>
     <button type="button" class="btn btn-sm btn-primary" onclick="setSelectMode(false)">Done</button>
   </div>
@@ -941,6 +943,25 @@
     <div class="modal-footer">
       <button type="button" class="btn" onclick="closeModal('remarkModal')">Cancel</button>
       <button type="button" class="btn btn-primary" onclick="saveRemarkFromModal()">Save Remark</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk edit: job number, vessel, client -->
+<div class="overlay hidden" id="bulkEditModal">
+  <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="bulkEditTitle">
+    <div class="modal-hdr"><h2 class="modal-title" id="bulkEditTitle">Update selected jobs</h2><button type="button" class="modal-close" onclick="closeModal('bulkEditModal')" aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="modal-body">
+      <p class="form-note">Fill in only what you want to change. Empty boxes keep each job's current value.</p>
+      <div class="form-grid one">
+        <div class="form-group fl"><input class="form-ctrl" id="beJobNum" placeholder=" " autocomplete="off" onkeydown="if(event.key==='Enter')saveBulkEdit()" aria-describedby="beJobNumNow"><label class="form-label" for="beJobNum">New Job Number</label><span class="form-hint" id="beJobNumNow"></span></div>
+        <div class="form-group fl"><input class="form-ctrl" id="beVessel" placeholder=" " autocomplete="off" onkeydown="if(event.key==='Enter')saveBulkEdit()" aria-describedby="beVesselNow"><label class="form-label" for="beVessel">New Vessel Name</label><span class="form-hint" id="beVesselNow"></span></div>
+        <div class="form-group fl"><input class="form-ctrl" id="beClient" placeholder=" " autocomplete="off" onkeydown="if(event.key==='Enter')saveBulkEdit()" aria-describedby="beClientNow"><label class="form-label" for="beClient">New Client Name</label><span class="form-hint" id="beClientNow"></span></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn" onclick="closeModal('bulkEditModal')">Cancel</button>
+      <button type="button" class="btn btn-primary" id="bulkEditSave" onclick="saveBulkEdit()">Update jobs</button>
     </div>
   </div>
 </div>

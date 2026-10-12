@@ -13,7 +13,8 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
   const b = await chromium.launch();
   const mk = async (opts = {}, seed = data) => {
     const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, serviceWorkers: 'block', ...opts });
-    await ctx.addInitScript(d => { if(!sessionStorage.seeded) { localStorage.setItem('jt_v2', d); sessionStorage.seeded = 1; } }, seed);
+    // jt_reminded: skip the "due today" reminder toast so it can't be mistaken for an Undo toast
+    await ctx.addInitScript(d => { if(!sessionStorage.seeded) { localStorage.setItem('jt_v2', d); sessionStorage.seeded = 1; sessionStorage.setItem('jt_reminded', '1'); } }, seed);
     const p = await ctx.newPage(); p.errs = [];
     p.on('pageerror', e => p.errs.push(e.message)); p.on('dialog', d => d.accept());
     await p.goto(BASE);
@@ -110,10 +111,21 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
     const ho = JT.persons.find(x => x.location === 'HO');
     bulkApply('person', ho.name);
     const ps = ids.every(id => { const j = JT.jobs.find(x => x.id === id); return j.personInCharge === ho.name && j.location === 'HO'; });
+    // Job number / vessel / client for all selected; empty box keeps the old value
+    const clients = ids.map(id => JT.jobs.find(j => j.id === id).clientName);
+    openBulkEdit();
+    const hint = document.getElementById('beVesselNow').textContent;
+    document.getElementById('beJobNum').value = 'NEW-123';
+    document.getElementById('beVessel').value = 'New Vessel';
+    saveBulkEdit();
+    const txt = ids.every((id, i) => { const j = JT.jobs.find(x => x.id === id); return j.jobNumber === 'NEW-123' && j.vesselName === 'New Vessel' && j.clientName === clients[i]; });
+    const closed = document.getElementById('bulkEditModal').classList.contains('hidden');
+    const savedTxt = JSON.parse(localStorage.getItem('jt_v2')).jobs.filter(j => ids.includes(j.id)).every(j => j.jobNumber === 'NEW-123');
     setSelectMode(false);
-    return { count, pr, ps, barHidden: document.getElementById('bulkBar').hidden };
+    return { count, pr, ps, txt, closed, savedTxt, hint, barHidden: document.getElementById('bulkBar').hidden };
   });
   ok('bulk select: priority and person applied to 3 jobs (location follows)', bulk.count === '3 selected' && bulk.pr && bulk.ps && bulk.barHidden, bulk);
+  ok('bulk edit: job number and vessel changed on all 3, client kept, saved', bulk.txt && bulk.closed && bulk.savedTxt && /^Now:/.test(bulk.hint), bulk);
 
   /* ── Copy ── */
   const copy = await p.evaluate(() => {
@@ -244,6 +256,48 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
   await p.keyboard.press('Enter');
   await p.waitForTimeout(500);
   ok('Enter opens the job on the Jobs page', await p.evaluate(() => isPageActive('jobs') && document.getElementById('paletteModal').classList.contains('hidden')));
+
+  /* ── Multi search & group by client ── */
+  const ms = await p.evaluate(async () => {
+    showPage('jobs'); clearJobFilters();
+    const s = document.getElementById('jobSearch');
+    const nums = [...new Set(JT.jobs.map(j => j.jobNumber).filter(Boolean))].slice(0, 3);
+    const client = JT.jobs.find(j => j.clientName && !nums.includes(j.jobNumber)).clientName;
+    const want = q => JT.jobs.filter(j => (j.jobNumber + j.vesselName + j.clientName + j.jobScope + (j.personInCharge || '')).toLowerCase().includes(q.toLowerCase())).map(j => j.id);
+    const union = [...new Set([...nums.flatMap(want), ...want(client)])].sort((a, b) => a - b);
+    s.value = nums.join(', ') + ', ' + client; renderJobsPage();
+    const got = getFilteredJobs().map(j => j.id).sort((a, b) => a - b);
+    const marks = document.querySelectorAll('#jobsBody mark').length;
+    const sub = document.getElementById('jobsSubtitle').textContent;
+    s.value = nums.join(' '); renderJobsPage();
+    const spaced = getFilteredJobs().length === [...new Set(nums.flatMap(want))].length;
+    s.value = ''; renderJobsPage();
+    jtJobsPlus.setGroup('client');
+    const groups = document.querySelectorAll('.jgroup').length;
+    const clients = new Set(JT.jobs.map(j => ((j.clientName || '').trim() || '(no client)').replace(/\s+/g, ' ').toLowerCase())).size;
+    jtJobsPlus.setGroup('');
+    return { equal: JSON.stringify(got) === JSON.stringify(union), n: got.length, marks, sub, spaced, groups, clients };
+  });
+  ok('search with commas shows jobs matching any of the terms (highlighted)', ms.equal && ms.n > 0 && ms.marks > 0 && /for 4 searches/.test(ms.sub), ms);
+  ok('pasted job numbers separated by spaces also search for each', ms.spaced, ms);
+  ok('group by client: one group per client', ms.groups === ms.clients, ms);
+
+  /* ── Typing a % and pressing Enter saves once (one Undo, and Undo restores the old value) ── */
+  await p.evaluate(() => { clearJobFilters(); setJobTab('ongoing'); document.getElementById('toastWrap').innerHTML = ''; });
+  await p.waitForTimeout(300);
+  const prow = p.locator('#jobsBody .jrow').nth(0);
+  const pid = await prow.evaluate(r => Number(r.id.slice(6)));
+  const pBefore = await p.evaluate(id => JT.jobs.find(j => j.id === id).completionPercentage || 0, pid);
+  const newPct = pBefore === 37 ? 38 : 37;
+  await prow.locator('input[name=pct]').fill(String(newPct));
+  await prow.locator('input[name=pct]').press('Enter');
+  await p.waitForTimeout(600);
+  const undoToasts = await p.evaluate(() => document.querySelectorAll('#toastWrap .toast-action').length);
+  await p.locator('#toastWrap .toast-action').last().click();
+  await p.waitForTimeout(300);
+  const pAfter = await p.evaluate(id => JT.jobs.find(j => j.id === id).completionPercentage || 0, pid);
+  ok('% + Enter shows one Undo, and Undo restores the old %', undoToasts === 1 && pAfter === pBefore, { undoToasts, pBefore, pAfter });
+  await p.evaluate(() => setJobTab('all'));
 
   ok('no page errors', p.errs.length === 0, p.errs.join(' | '));
   await ctx.close();

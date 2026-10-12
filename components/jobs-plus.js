@@ -30,10 +30,25 @@
   }
 
   /* ───────── Grouping ───────── */
-  const groupKey = j => st.group === 'jobnum' ? (j.jobNumber || '(no job number)') : (j.vesselName || '(no vessel)');
+  const groupKey = j => st.group === 'jobnum' ? (j.jobNumber || '(no job number)')
+    : st.group === 'client' ? ((j.clientName || '').trim() || '(no client)')
+    : (j.vesselName || '(no vessel)');
   function renderGroups(wrap, jobs, term, head, card) {
     const groups = new Map();
-    jobs.forEach(j => { const k = groupKey(j); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(j); });
+    // Same name with different capitals/spaces ("ZAKHER MARINE" / "Zakher Marine") is one group,
+    // shown with its most common spelling
+    const norm = k => k.trim().replace(/\s+/g, ' ').toLowerCase();
+    const byNorm = new Map(), spell = new Map();
+    jobs.forEach(j => {
+      const raw = groupKey(j), n = norm(raw);
+      if(!byNorm.has(n)) { byNorm.set(n, []); spell.set(n, new Map()); }
+      byNorm.get(n).push(j);
+      spell.get(n).set(raw, (spell.get(n).get(raw) || 0) + 1);
+    });
+    byNorm.forEach((list, n) => {
+      const label = [...spell.get(n)].sort((a, b) => b[1] - a[1])[0][0];
+      groups.set(spell.get(n).size > 1 ? label + ` (${spell.get(n).size} spellings)` : label, list);
+    });
     const defOpen = groups.size <= 25 || !!term;
     let html = `<h2 class="sr-only">Job list, grouped</h2>${head}<div class="jobs-body" id="jobsBody">`;
     let gi = 0;
@@ -43,7 +58,10 @@
       const over = list.filter(isOverdue).length;
       const active = list.filter(j => !['complete','rework completed','cancelled'].includes(j.status));
       const avg = active.length ? Math.round(active.reduce((s, j) => s + Math.min(100, j.completionPercentage || 0), 0) / active.length) : 100;
-      const sub = st.group === 'jobnum' ? (list[0].vesselName || '') : (list[0].clientName || '');
+      const vessels = [...new Set(list.map(j => j.vesselName).filter(Boolean))];
+      const sub = st.group === 'jobnum' ? (list[0].vesselName || '')
+        : st.group === 'client' ? (vessels.length > 2 ? `${vessels.length} vessels: ${vessels.slice(0, 2).join(', ')}…` : vessels.join(', '))
+        : (list[0].clientName || '');
       html += `<section class="jgroup${open ? ' open' : ''}" aria-labelledby="${id}-h">
         <button type="button" class="jgroup-hdr" id="${id}-h" aria-expanded="${open}" aria-controls="${id}" onclick="jtJobsPlus.toggleGroup(${jsArg(k)})">
           ${ic('chevron-right')}
