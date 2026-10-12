@@ -245,6 +245,23 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
   await p.waitForTimeout(500);
   ok('Enter opens the job on the Jobs page', await p.evaluate(() => isPageActive('jobs') && document.getElementById('paletteModal').classList.contains('hidden')));
 
+  /* ── Typing a % and pressing Enter saves once (one Undo, and Undo restores the old value) ── */
+  await p.evaluate(() => { clearJobFilters(); setJobTab('ongoing'); document.getElementById('toastWrap').innerHTML = ''; });
+  await p.waitForTimeout(300);
+  const prow = p.locator('#jobsBody .jrow').nth(0);
+  const pid = await prow.evaluate(r => Number(r.id.slice(6)));
+  const pBefore = await p.evaluate(id => JT.jobs.find(j => j.id === id).completionPercentage || 0, pid);
+  const newPct = pBefore === 37 ? 38 : 37;
+  await prow.locator('input[name=pct]').fill(String(newPct));
+  await prow.locator('input[name=pct]').press('Enter');
+  await p.waitForTimeout(600);
+  const undoToasts = await p.evaluate(() => document.querySelectorAll('#toastWrap .toast-action').length);
+  await p.locator('#toastWrap .toast-action').last().click();
+  await p.waitForTimeout(300);
+  const pAfter = await p.evaluate(id => JT.jobs.find(j => j.id === id).completionPercentage || 0, pid);
+  ok('% + Enter shows one Undo, and Undo restores the old %', undoToasts === 1 && pAfter === pBefore, { undoToasts, pBefore, pAfter });
+  await p.evaluate(() => setJobTab('all'));
+
   ok('no page errors', p.errs.length === 0, p.errs.join(' | '));
   await ctx.close();
   await b.close();

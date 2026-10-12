@@ -2264,6 +2264,9 @@ function quickPctChange(jobId, val) {
   const pct = Math.min(100, Math.max(0, parseInt(val)||0));
   const j = JT.jobs.find(x=>x.id===jobId);
   if(!j) return;
+  // Same value again (e.g. Enter, then the box losing focus as the row refreshes): nothing to do.
+  // Saving twice made two Undo toasts and left Undo pointing at the duplicate.
+  if(pct === (j.completionPercentage||0) && pct !== 100) return;
   j.completionPercentage = pct;
   if(pct===100) {
     // Pass the correct target status to openCompletionDate
