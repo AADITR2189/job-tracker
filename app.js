@@ -320,7 +320,7 @@ function updateSidebarCounts() {
   document.getElementById('sfc-cancelled').textContent = jobs.filter(j=>j.status==='cancelled').length;
   document.getElementById('sfc-overdue').textContent = jobs.filter(j=>isOverdue(j)).length;
   // tab counts
-  ['all','active','ongoing','planned','not planned','rework','hold','complete','cancelled'].forEach(tab => {
+  ['all','active','ongoing','planned','not planned','rework','rework planned','rework ongoing','rework completed','hold','complete','cancelled'].forEach(tab => {
     const el = document.getElementById('tc-'+tab.replace(' ','-'));
     if(!el) return;
     let count;

@@ -257,6 +257,21 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
   await p.waitForTimeout(500);
   ok('Enter opens the job on the Jobs page', await p.evaluate(() => isPageActive('jobs') && document.getElementById('paletteModal').classList.contains('hidden')));
 
+  /* ── Rework status tabs ── */
+  const rw = await p.evaluate(() => {
+    showPage('jobs'); clearJobFilters();
+    const r = {};
+    for(const st of ['rework planned', 'rework ongoing', 'rework completed']) {
+      document.querySelector(`#jobsTabBar [data-tab="${st}"]`).click();
+      const shown = getFilteredJobs();
+      r[st] = { shown: shown.length, all: shown.every(j => j.status === st), want: JT.jobs.filter(j => j.status === st).length,
+        count: Number(document.getElementById('tc-' + st.replace(' ', '-')).textContent) };
+    }
+    setJobTab('all');
+    return r;
+  });
+  ok('Rework Planned / Ongoing / Completed tabs show the right jobs and counts', Object.values(rw).every(x => x.all && x.shown === x.want && x.count === x.want), rw);
+
   /* ── Multi search & group by client ── */
   const ms = await p.evaluate(async () => {
     showPage('jobs'); clearJobFilters();

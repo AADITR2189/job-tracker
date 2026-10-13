@@ -14,7 +14,7 @@
      download the new files.
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION = 'v2.4.2';
+const CACHE_VERSION = 'v2.4.3';
 const SHELL_CACHE = `jt-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = 'jt-runtime-v1';
 const NOTIFY_CACHE = 'jt-notify';   // small "jobs due" summary written by the page (no job data beyond names)
