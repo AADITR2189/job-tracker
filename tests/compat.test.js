@@ -30,6 +30,14 @@ const withPersonLocations = d => {
 };
 const expected = withPersonLocations(input);
 
+
+// Imports replace all data, so v2 asks in its own confirmation window: press its OK button
+async function acceptInAppConfirms(p) {
+  for(let i = 0; i < 3; i++) {
+    try { await p.click('#jtConfirm:not(.hidden) #jtConfirmOk', { timeout: 1500 }); await p.waitForTimeout(200); } catch(e) { break; }
+  }
+}
+
 let failures = 0;
 const check = (name, a, b) => {
   const ok = JSON.stringify(a) === JSON.stringify(b);
@@ -154,6 +162,7 @@ const captureExport = async () => {
     await p.evaluate(() => { localStorage.setItem('jt_v2', JSON.stringify({jobs:[{id:1,vesselName:'x',jobScope:'y',status:'planned'}],persons:[],upcomingJobs:[]})); });
     await p.reload(); await p.waitForTimeout(300);
     await p.setInputFiles('#fileImport', file);
+    await acceptInAppConfirms(p);
     await p.waitForTimeout(800);
     return p.evaluate(() => JSON.parse(localStorage.getItem('jt_v2')));
   };

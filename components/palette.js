@@ -68,7 +68,7 @@
   function choose(i) {
     const it = items[i]; if(!it) return;
     close();
-    setTimeout(() => it.run(), 30);
+    it.run();
   }
   function open() {
     if(!ov.classList.contains('hidden')) return;
@@ -111,7 +111,7 @@
     if(overdue) parts.push(`${overdue} overdue`);
     showToast(parts.join(' · '), overdue ? 'err' : '', { action: 'View', onAction: () => {
       showPage('jobs'); clearJobFilters();
-      if(overdue) toggleQuickFilter('overdue'); else toggleQuickFilter('week');
+      if(overdue) setJobTab('overdue'); else toggleQuickFilter('week');
     } });
   }
 

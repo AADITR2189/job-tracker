@@ -69,12 +69,15 @@ let fail = 0; const ok = (n, c, x) => { console.log(c ? '✓' : '✗', n, x ?? '
   ok('row folds away before delete', await p.evaluate(i => !!document.getElementById('jcard-' + i) && document.getElementById('jcard-' + i).getAnimations().length > 0, newId));
   await p.waitForTimeout(500);
   ok('job deleted and saved', await p.evaluate(([i, n]) => JT.jobs.length === n - 1 && !JSON.parse(localStorage.getItem('jt_v2')).jobs.some(j => j.id === i), [newId, n0]));
+  // Delete no longer asks first (Undo is offered); Undo brings the row back the way it left
   let dialogs = 0; p.on('dialog', () => dialogs++);
   const n1 = await p.evaluate(() => JT.jobs.length);
-  await p.evaluate(() => { window.confirm = () => false; deleteJob(JT.jobs[0].id); });
+  await p.evaluate(() => { document.getElementById('toastWrap').innerHTML = ''; deleteJob(JT.jobs[0].id); });
   await p.waitForTimeout(500);
-  ok('cancelling delete keeps the job', await p.evaluate(n => JT.jobs.length === n, n1));
-  await p.evaluate(() => { delete window.confirm; });
+  ok('delete asks nothing and offers Undo', dialogs === 0 && await p.evaluate(n => JT.jobs.length === n - 1 && !!document.querySelector('#toastWrap .toast-action'), n1));
+  await p.evaluate(() => [...document.querySelectorAll('#toastWrap .toast-action')].pop().click());
+  await p.waitForTimeout(400);
+  ok('Undo restores the deleted job', await p.evaluate(n => JT.jobs.length === n, n1));
 
   // 5 celebration on completion
   await p.fill('#jobSearch', '');

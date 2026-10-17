@@ -5,6 +5,8 @@
      • Mouse: drag starts after a small movement.
      • Touch: press and hold briefly, then drag (so normal scrolling still works).
      • Esc cancels. The page scrolls when you drag near its edge.
+     • A quick flick counts: the drop point is projected from the release speed.
+     • On drop the item flies into its new place (opts.landing), so there is no jump.
    ════════════════════════════════════════════════════════════════════ */
 
 window.jtDrag = function(container, opts) {
@@ -20,7 +22,7 @@ window.jtDrag = function(container, opts) {
     if(!item || !container.contains(item)) return;
     if(e.target.closest('input, select, textarea, .no-drag')) return;
     if(opts.enabled && !opts.enabled(item)) return;
-    s = { item, id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse', dragging: false, over: null };
+    s = { item, id: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, touch: e.pointerType !== 'mouse', dragging: false, over: null, vel: jtVelocity() };
     if(s.touch) s.timer = setTimeout(() => { if(s && !s.dragging) start(); }, HOLD);
   });
 
@@ -90,11 +92,35 @@ window.jtDrag = function(container, opts) {
     setTimeout(() => window.removeEventListener('click', swallow, { capture: true }), 50);
     const g = st.ghost;
     const finish = () => { g.remove(); st.item.classList.remove('drag-src'); };
+    // Flick: no target under the finger, but the throw is heading to one
+    if(drop && !st.over) {
+      const v = st.vel.get();
+      const px = Math.max(2, Math.min(innerWidth - 2, st.x + jtProject(v.x, 0.99)));
+      const py = Math.max(2, Math.min(innerHeight - 2, st.y + jtProject(v.y, 0.99)));
+      const el = document.elementFromPoint(px, py);
+      const t = el && el.closest(opts.drop);
+      if(t && (!opts.canDrop || opts.canDrop(st.item, t))) st.over = t;
+    }
     if(drop && st.over) {
-      g.style.transition = 'opacity 160ms ease, transform 160ms ease';
-      g.style.opacity = '0';
-      setTimeout(finish, 160);
+      jtBuzz(8);
+      const key = st.item;
       opts.onDrop(st.item, st.over);
+      // Fly the ghost into the item's new place, then reveal it there
+      const dest = opts.landing ? opts.landing(key, st.over) : null;
+      if(dest && document.contains(dest) && dest !== st.item) {
+        const r = dest.getBoundingClientRect();
+        dest.style.opacity = '0';
+        g.style.transition = 'transform 280ms cubic-bezier(.22,1,.36,1), width 280ms cubic-bezier(.22,1,.36,1), height 280ms cubic-bezier(.22,1,.36,1)';
+        g.style.width = r.width + 'px'; g.style.height = r.height + 'px';
+        g.style.transform = `translate3d(${r.left}px, ${r.top}px, 0)`;
+        setTimeout(() => { dest.style.opacity = ''; finish(); }, 280);
+      } else {
+        // Nothing to fly to (e.g. a dialog opened first): settle back where it came from
+        const r = st.item.getBoundingClientRect();
+        g.style.transition = 'transform 260ms cubic-bezier(.22,1,.36,1)';
+        g.style.transform = `translate3d(${r.left}px, ${r.top}px, 0)`;
+        setTimeout(finish, 260);
+      }
     } else {
       // Glide back to where it came from
       const r = st.item.getBoundingClientRect();
@@ -107,6 +133,7 @@ window.jtDrag = function(container, opts) {
   document.addEventListener('pointermove', e => {
     if(!s || e.pointerId !== s.id) return;
     s.x = e.clientX; s.y = e.clientY;
+    s.vel.add(s.x, s.y);
     if(!s.dragging) {
       const moved = Math.hypot(s.x - s.x0, s.y - s.y0);
       if(s.touch) { if(moved > 10) { clearTimeout(s.timer); s = null; } }   // it's a scroll

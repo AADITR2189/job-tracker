@@ -40,7 +40,10 @@
   applyTheme = function(pref, animate) {
     const next = resolveTheme(pref);
     const changing = next !== document.documentElement.getAttribute('data-theme');
-    if(!animate || !changing || !canVT()) return _applyTheme(pref, animate);
+    if(!animate || !changing) return _applyTheme(pref, animate);
+    // Reduce motion: a soft cross-fade between themes instead of an instant brightness jump
+    if(reduced() && typeof document.startViewTransition === 'function') { try { document.startViewTransition(() => _applyTheme(pref, false)); return; } catch(e) {} }
+    if(!canVT()) return _applyTheme(pref, animate);
     const p = lastPoint || (() => {
       const b = document.getElementById('themeToggle')?.getBoundingClientRect();
       return b ? { x: b.left + b.width / 2, y: b.top + b.height / 2 } : { x: innerWidth - 40, y: 30 };
@@ -58,8 +61,12 @@
   };
 
   /* ── 5. Completion celebration ───────────────────────────────────── */
+  const buzz = p => { try { if(navigator.vibrate) navigator.vibrate(p); } catch(e) {} };
   function celebrate() {
+    buzz([12, 40, 18]);
     if(reduced()) return;
+    let confetti = true;
+    try { const d = new Date().toDateString(); confetti = localStorage.getItem('jt_confetti_day') !== d; localStorage.setItem('jt_confetti_day', d); } catch(e) {}
     const layer = document.createElement('div');
     layer.className = 'celebrate';
     layer.setAttribute('aria-hidden', 'true');
@@ -67,7 +74,7 @@
     document.body.appendChild(layer);
     const colors = ['#2E3D28', '#A9B887', '#F59E0B', '#22C55E', '#6F8A55', '#E8E9DF'];
     const cx = innerWidth / 2, cy = innerHeight / 2;
-    for(let i = 0; i < 28; i++) {
+    for(let i = 0; i < (confetti ? 28 : 0); i++) {
       const s = document.createElement('i');
       s.style.background = colors[i % colors.length];
       s.style.left = cx + 'px'; s.style.top = cy + 'px';
@@ -96,6 +103,13 @@
 
   /* ── 6 & 7. Job list: smooth progress, glow for new / edited rows ── */
   const pctMem = new Map(), sigMem = new Map();
+  const glides = new Map();   // job id → { anim, from, to } of the glide in flight
+  const liveFrac = id => {     // where the bar is on screen now (0–1), or null if not gliding
+    const g = glides.get(id); if(!g) return null;
+    const t = g.anim.effect.getComputedTiming().progress;
+    if(t === null || g.anim.playState === 'finished') return null;
+    return g.from + (g.to - g.from) * t;
+  };
   let knownIds = null;
   const pctOf = j => Math.min(100, j.completionPercentage || 0);
   function processRow(row) {
@@ -107,16 +121,21 @@
     if(!reduced()) {
       const oldPct = pctMem.get(id);
       if(oldPct !== undefined && oldPct !== pct) {
-        const opts = { duration: 900, easing: 'cubic-bezier(.45, 0, .2, 1)' };  // gentle ease-in-out glide
-        const barAnim = row.querySelector('.mini-progress > span')?.animate([{ width: oldPct + '%' }, { width: pct + '%' }], opts);
-        row.querySelector('.jrow-progress')?.animate([{ width: oldPct + '%' }, { width: pct + '%' }], opts);
+        // Start from the bar's on-screen position if it is still gliding, so a second change never jumps
+        const live = liveFrac(id);
+        const from = live !== null ? live : oldPct / 100, to = pct / 100;
+        const opts = { duration: 700, easing: 'cubic-bezier(.22, 1, .36, 1)' };   // fast start, soft settle
+        const frames = [{ transform: `scaleX(${from})` }, { transform: `scaleX(${to})` }];
+        const barAnim = row.querySelector('.mini-progress > span')?.animate(frames, opts);
+        row.querySelector('.jrow-progress')?.animate(frames, opts);
+        if(barAnim) glides.set(id, { anim: barAnim, from, to });
         const label = row.querySelector('.mini-pct');
         if(label && barAnim) {
           // The number follows the bar exactly (same easing, same clock)
           const step = () => {
             const t = barAnim.effect.getComputedTiming().progress;
             const done = t === null || barAnim.playState === 'finished';
-            label.textContent = Math.round(done ? pct : oldPct + (pct - oldPct) * t) + '%';
+            label.textContent = Math.round(done ? pct : (from + (to - from) * t) * 100) + '%';
             if(!done && label.isConnected) requestAnimationFrame(step);
           };
           requestAnimationFrame(step);
@@ -124,7 +143,10 @@
       }
       const isNew = knownIds && !knownIds.has(id);
       const isEdited = sigMem.has(id) && sigMem.get(id) !== sig;
-      if(isNew || isEdited) {
+      if(isNew && recentlyDeleted.has(id)) {
+        recentlyDeleted.delete(id);
+        row.animate([{ opacity: 0, transform: 'translateX(-24px)' }, { opacity: 1, transform: 'none' }], { duration: 320, easing: EASE });
+      } else if(isNew || isEdited) {
         row.classList.remove('flash', 'glow-new');
         void row.offsetWidth;
         row.classList.add(isNew ? 'glow-new' : 'flash');
@@ -157,24 +179,28 @@
     }).observe(wrap, { childList: true, subtree: true });
   }
 
-  // Delete: fold the row away, then run the original delete
+  // Delete: the row slides out, then the rows below glide up into the gap.
+  // Only transform/opacity are animated (cheap on phones). Undo is offered by the toast.
+  const recentlyDeleted = new Set();
   const _deleteJob = deleteJob;
   deleteJob = function(id) {
-    if(!confirm('Delete this job?')) return;
-    const run = () => {
-      const c = window.confirm;
-      window.confirm = () => true;   // already confirmed above; keep the original function untouched
-      try { _deleteJob(id); } finally { window.confirm = c; }
-    };
+    recentlyDeleted.add(id);
     const row = document.getElementById('jcard-' + id);
-    if(!row || reduced()) return run();
-    const h = row.offsetHeight;
-    row.style.overflow = 'hidden';
-    row.animate([
-      { opacity: 1, transform: 'translateX(0)', height: h + 'px' },
-      { opacity: 0, transform: 'translateX(-24px)', height: h + 'px', offset: .55 },
-      { opacity: 0, transform: 'translateX(-24px)', height: '0px', paddingTop: '0', paddingBottom: '0', marginTop: '0', marginBottom: '0', borderWidth: '0' }
-    ], { duration: 380, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' }).finished.then(run, run);
+    if(!row || reduced() || !row.offsetParent) return _deleteJob(id);
+    const out = row.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateX(-24px)' }],
+      { duration: 200, easing: 'cubic-bezier(.4, 0, 1, 1)', fill: 'forwards' });
+    const run = () => {
+      // FLIP: remember where the visible rows were, delete, then animate them from there
+      const vh = innerHeight, before = new Map();
+      document.querySelectorAll('#jobsListWrap .jrow').forEach(r => { const b = r.getBoundingClientRect(); if(b.bottom > -50 && b.top < vh + 50) before.set(r.id, b.top); });
+      _deleteJob(id);
+      before.forEach((top, rid) => {
+        const el = document.getElementById(rid); if(!el) return;
+        const dy = top - el.getBoundingClientRect().top;
+        if(Math.abs(dy) > 1) el.animate([{ transform: `translateY(${dy}px)` }, { transform: 'none' }], { duration: 300, easing: EASE });
+      });
+    };
+    out.finished.then(run, run);
   };
 
   /* ── 8. Planning: slide the week ─────────────────────────────────── */

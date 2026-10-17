@@ -39,7 +39,6 @@
       }
       if(j.status === 'not planned') j.status = 'planned';
     }
-    landed = (isUp ? 'u' : 'j') + j.id;
     save();
     renderAll();
     const when = new Date(to + 'T00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -63,6 +62,11 @@
       enabled: chip => !!chip.dataset.up || chip.dataset.own === '1',
       canDrop: (chip, cell) => !(cell.dataset.ds === chip.dataset.from && cell.closest('tr') === chip.closest('tr')),
       onDrop: moveChip,
+      landing: (chip, cell) => {
+        const sel = chip.dataset.up ? `[data-up="${chip.dataset.up}"]` : `[data-job="${chip.dataset.job}"]`;
+        const td = document.querySelector(`#planTable td.pc[data-ds="${cell.dataset.ds}"][data-person="${CSS.escape(cell.dataset.person)}"]`);
+        return (td && td.querySelector('.plan-chip' + sel)) || null;
+      },
       scrollers: () => [document.querySelector('#page-planning .plan-wrap')],
     });
   };
