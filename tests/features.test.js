@@ -94,7 +94,7 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
     const okOd = od.every(isOverdue) && od.length === JT.jobs.filter(isOverdue).length;
     toggleQuickFilter('high');
     const both = getFilteredJobs().every(j => isOverdue(j) && ['top urgent','urgent'].includes(j.priorityLevel));
-    const pressed = document.querySelectorAll('#quickChips [aria-pressed="true"]').length;
+    const pressed = document.querySelectorAll('#quickChips [aria-pressed="true"]').length + 1;   // Overdue has no chip (the Overdue tab is the one control)
     clearJobFilters();
     return { all, okOd, both, pressed, cleared: getFilteredJobs().length === all };
   });
@@ -122,6 +122,7 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
     const closed = document.getElementById('bulkEditModal').classList.contains('hidden');
     const savedTxt = JSON.parse(localStorage.getItem('jt_v2')).jobs.filter(j => ids.includes(j.id)).every(j => j.jobNumber === 'NEW-123');
     setSelectMode(false);
+    await new Promise(r => setTimeout(r, 350));   // the bar fades out before it hides
     return { count, pr, ps, txt, closed, savedTxt, hint, barHidden: document.getElementById('bulkBar').hidden };
   });
   ok('bulk select: priority and person applied to 3 jobs (location follows)', bulk.count === '3 selected' && bulk.pr && bulk.ps && bulk.barHidden, bulk);
@@ -314,8 +315,47 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
   ok('% + Enter shows one Undo, and Undo restores the old %', undoToasts === 1 && pAfter === pBefore, { undoToasts, pBefore, pAfter });
   await p.evaluate(() => setJobTab('all'));
 
+  /* ── Row "More" menu ── */
+  await p.evaluate(() => { showPage('jobs'); clearJobFilters(); setJobTab('ongoing'); });
+  await p.waitForTimeout(300);
+  await p.locator('#jobsBody .jrow .act-more').first().click();
+  const menu = await p.evaluate(() => ({ items: [...document.querySelectorAll('#rowMenu [data-act]')].map(b => b.dataset.act), focused: document.activeElement?.closest('#rowMenu') !== null }));
+  await p.keyboard.press('Escape');
+  const menuClosed = await p.evaluate(() => !document.getElementById('rowMenu') && document.activeElement?.classList.contains('act-more'));
+  ok('More menu lists the other actions, keyboard-focused, Esc closes back to the button', ['reassign','shift','priority','copy','share','del'].every(a => menu.items.includes(a)) && menu.focused && menuClosed, { menu, menuClosed });
+  const once = await p.evaluate(() => { const r = document.querySelector('#jobsBody .jrow'); return { pills: r.querySelectorAll('.status-pill').length, visibleSelects: [...r.querySelectorAll('select')].filter(x => x.offsetParent).length }; });
+  ok('status appears once per row on desktop (the pill)', once.pills === 1 && once.visibleSelects === 1, once);
+
   ok('no page errors', p.errs.length === 0, p.errs.join(' | '));
   await ctx.close();
+
+  /* ── Phone gestures: drag a sheet down to close; swipe the side menu closed ── */
+  {
+    const m = await b.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block', hasTouch: true });
+    await m.addInitScript(d => { if(!sessionStorage.seeded) { localStorage.setItem('jt_v2', d); sessionStorage.seeded = 1; sessionStorage.setItem('jt_reminded', '1'); } }, data);
+    const mp = await m.newPage(); const errs = []; mp.on('pageerror', e => errs.push(e.message));
+    await mp.goto(BASE); await mp.waitForFunction(() => window.jtGestures);
+    await mp.evaluate(() => openAddJob()); await mp.waitForTimeout(500);
+    const h = await mp.locator('#jobModal .modal-hdr').boundingBox();
+    await mp.mouse.move(h.x + 40, h.y + 20); await mp.mouse.down();
+    for(let i = 1; i <= 6; i++) { await mp.mouse.move(h.x + 40, h.y + 20 + i * 45); await mp.waitForTimeout(16); }
+    await mp.mouse.up(); await mp.waitForTimeout(900);
+    ok('phone: dragging a sheet down closes it', await mp.evaluate(() => document.getElementById('jobModal').classList.contains('hidden')));
+    await mp.evaluate(() => openAddJob()); await mp.waitForTimeout(500);
+    const h2 = await mp.locator('#jobModal .modal-hdr').boundingBox();
+    await mp.mouse.move(h2.x + 40, h2.y + 20); await mp.mouse.down(); await mp.mouse.move(h2.x + 40, h2.y + 50, { steps: 5 }); await mp.waitForTimeout(200); await mp.mouse.up(); await mp.waitForTimeout(900);
+    ok('phone: a small drag springs the sheet back open', await mp.evaluate(() => !document.getElementById('jobModal').classList.contains('hidden') && !document.querySelector('#jobModal .modal').style.transform));
+    await mp.evaluate(() => closeModal('jobModal')); await mp.waitForTimeout(400);
+    await mp.evaluate(() => openDrawer()); await mp.waitForTimeout(400);
+    const sbx = await mp.locator('#sidebar').boundingBox();
+    await mp.mouse.move(sbx.x + 200, sbx.y + 400); await mp.mouse.down();
+    for(let i = 1; i <= 6; i++) { await mp.mouse.move(sbx.x + 200 - i * 40, sbx.y + 402); await mp.waitForTimeout(16); }
+    await mp.mouse.up(); await mp.waitForTimeout(900);
+    ok('phone: swiping the side menu left closes it', await mp.evaluate(() => !document.getElementById('sidebar').classList.contains('open') && !document.getElementById('sidebar').style.transform));
+    ok('phone: bottom bar says "Dashboard" and More shows the page you are on', await mp.evaluate(() => { showPage('persons'); return document.querySelector('.bnav-btn[data-page="dashboard"]').textContent.trim() === 'Dashboard' && document.querySelector('.bnav-btn[data-more]').textContent.trim() === 'Persons'; }));
+    ok('phone: no page errors', errs.length === 0, errs.join(' | '));
+    await m.close();
+  }
   await b.close();
   console.log(fail ? `\n${fail} FAILED` : '\nAll feature checks passed');
   process.exit(fail ? 1 : 0);

@@ -14,7 +14,7 @@
      download the new files.
    ════════════════════════════════════════════════════════════════════ */
 
-const CACHE_VERSION = 'v2.4.3';
+const CACHE_VERSION = 'v2.5.0';
 const SHELL_CACHE = `jt-shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = 'jt-runtime-v1';
 const NOTIFY_CACHE = 'jt-notify';   // small "jobs due" summary written by the page (no job data beyond names)
@@ -32,6 +32,7 @@ const SHELL_ASSETS = [
   'components/sync.js',
   'components/motion.js',
   'components/drag.js',
+  'components/gestures.js',
   'components/jobs-plus.js',
   'components/planning-plus.js',
   'components/insights.js',

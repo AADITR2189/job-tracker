@@ -51,10 +51,6 @@
 <link rel="apple-touch-startup-image" href="icons/splash/splash-1620x2160.png" media="(device-width: 810px) and (device-height: 1080px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
 <link rel="apple-touch-startup-image" href="icons/splash/splash-1536x2048.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" media="print" onload="this.media='all'">
-<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"></noscript>
 <link rel="stylesheet" href="styles.css">
 
 <script src="components/data-compat.js" defer></script>
@@ -122,6 +118,7 @@
     <symbol id="i-palette" viewBox="0 0 24 24"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c.93 0 1.5-.75 1.5-1.5 0-.39-.15-.74-.39-1.01a1.5 1.5 0 0 1 1.12-2.49H16a6 6 0 0 0 6-6c0-4.97-4.48-9-10-9z"/></symbol>
     <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
     <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
     <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
     <symbol id="i-board" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
@@ -240,7 +237,6 @@
         <button type="button" class="seg-btn" id="dashLocHO" onclick="setDashAvailLoc('HO')" aria-pressed="false">HO</button>
         <button type="button" class="seg-btn" id="dashLocCOK" onclick="setDashAvailLoc('COK')" aria-pressed="false">COK</button>
       </div>
-      <button type="button" class="btn btn-primary" onclick="openAddJob()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add Job</button>
     </div>
   </div>
   <h2 class="sr-only">Job statistics</h2>
@@ -282,7 +278,6 @@
         <button type="button" class="seg-btn active" id="viewListBtn" onclick="jtJobsPlus.setView('list')" aria-pressed="true"><svg class="ic" aria-hidden="true"><use href="#i-list"/></svg>List</button>
         <button type="button" class="seg-btn" id="viewBoardBtn" onclick="jtJobsPlus.setView('board')" aria-pressed="false"><svg class="ic" aria-hidden="true"><use href="#i-board"/></svg>Board</button>
       </div>
-      <button type="button" class="btn btn-primary" onclick="openAddJob()"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg>Add Job</button>
     </div>
   </div>
   <div class="tab-bar" id="jobsTabBar" role="group" aria-label="Filter jobs by status">
@@ -344,14 +339,13 @@
           <option value="progress:asc">Progress (lowest)</option>
         </select>
       </div>
-      <label class="check-chip"><input type="checkbox" id="jobOverdueOnly" onchange="renderJobsPage();updateClearBtn()"><span><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Overdue only</span></label>
+      <label class="check-chip" hidden><input type="checkbox" id="jobOverdueOnly" onchange="renderJobsPage();updateClearBtn()"><span><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Overdue only</span></label>
       <button type="button" id="clearFiltersBtn" class="btn btn-warn-soft" onclick="clearJobFilters()" title="Clear all active filters" style="display:none"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg>Clear filters</button>
     </div>
   </div>
   <div class="jobs-toolbar">
     <div class="quick-chips" id="quickChips" role="group" aria-label="Quick filters">
       <button type="button" class="qchip" data-q="week" aria-pressed="false" onclick="toggleQuickFilter('week',this)"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg>Due this week</button>
-      <button type="button" class="qchip qchip-danger" data-q="overdue" aria-pressed="false" onclick="toggleQuickFilter('overdue',this)"><svg class="ic" aria-hidden="true"><use href="#i-alert"/></svg>Overdue</button>
       <button type="button" class="qchip" data-q="high" aria-pressed="false" onclick="toggleQuickFilter('high',this)"><svg class="ic" aria-hidden="true"><use href="#i-flag"/></svg>High priority</button>
       <button type="button" class="qchip" data-q="notstarted" aria-pressed="false" onclick="toggleQuickFilter('notstarted',this)"><svg class="ic" aria-hidden="true"><use href="#i-hourglass"/></svg>Not started</button>
     </div>
@@ -363,9 +357,9 @@
         <option value="vessel">Group by vessel</option>
         <option value="client">Group by client</option>
       </select>
-      <button type="button" class="icon-btn bordered" id="densityBtn" onclick="jtJobsPlus.toggleDensity()" aria-pressed="false" title="Compact view"><svg class="ic" aria-hidden="true"><use href="#i-rows"/></svg><span class="sr-only">Compact view</span></button>
-      <button type="button" class="icon-btn bordered" id="selectModeBtn" onclick="setSelectMode(!_selectMode)" aria-pressed="false" title="Select jobs"><svg class="ic" aria-hidden="true"><use href="#i-check-square"/></svg><span class="sr-only">Select jobs</span></button>
-      <button type="button" class="icon-btn bordered" onclick="exportExcel('view')" title="Export these jobs to Excel"><svg class="ic" aria-hidden="true"><use href="#i-table"/></svg><span class="sr-only">Export these jobs to Excel</span></button>
+      <button type="button" class="btn btn-sm tool-btn" id="densityBtn" onclick="jtJobsPlus.toggleDensity()" aria-pressed="false" title="Compact view"><svg class="ic" aria-hidden="true"><use href="#i-rows"/></svg><span>Compact</span></button>
+      <button type="button" class="btn btn-sm tool-btn" id="selectModeBtn" onclick="setSelectMode(!_selectMode)" aria-pressed="false" title="Select jobs"><svg class="ic" aria-hidden="true"><use href="#i-check-square"/></svg><span>Select</span></button>
+      <button type="button" class="btn btn-sm tool-btn" onclick="exportExcel('view')" title="Export these jobs to Excel"><svg class="ic" aria-hidden="true"><use href="#i-table"/></svg><span>Excel</span></button>
     </div>
   </div>
   <div class="bulk-bar" id="bulkBar" role="region" aria-label="Selected jobs" hidden>
@@ -594,7 +588,7 @@
 
 <!-- ===== MOBILE BOTTOM NAV ===== -->
 <nav class="bottom-nav" id="bottomNav" aria-label="Quick navigation">
-  <button type="button" class="bnav-btn active" data-page="dashboard" onclick="showPage('dashboard')" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-dashboard"/></svg><span>Home</span></button>
+  <button type="button" class="bnav-btn active" data-page="dashboard" onclick="showPage('dashboard')" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-dashboard"/></svg><span>Dashboard</span></button>
   <button type="button" class="bnav-btn" data-page="jobs" onclick="showPage('jobs')"><svg class="ic" aria-hidden="true"><use href="#i-briefcase"/></svg><span>Jobs</span></button>
   <button type="button" class="bnav-btn" data-page="planning" onclick="showPage('planning')"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg><span>Planning</span></button>
   <button type="button" class="bnav-btn" data-page="reports" onclick="showPage('reports')"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg><span>Reports</span></button>
@@ -965,6 +959,18 @@
     <div class="modal-footer">
       <button type="button" class="btn" onclick="closeModal('bulkEditModal')">Cancel</button>
       <button type="button" class="btn btn-primary" id="bulkEditSave" onclick="saveBulkEdit()">Update jobs</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmation (only for actions that replace data and cannot be undone with the Undo button) -->
+<div class="overlay hidden" id="jtConfirm">
+  <div class="modal modal-sm confirm-modal" role="alertdialog" aria-modal="true" aria-labelledby="jtConfirmTitle" aria-describedby="jtConfirmText">
+    <div class="modal-hdr"><h2 class="modal-title" id="jtConfirmTitle"></h2></div>
+    <div class="modal-body"><p class="confirm-text" id="jtConfirmText"></p></div>
+    <div class="modal-footer">
+      <button type="button" class="btn" id="jtConfirmCancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="jtConfirmOk">OK</button>
     </div>
   </div>
 </div>

@@ -7,6 +7,14 @@ const fs = require('fs'), path = require('path');
 const BASE = process.env.BASE || 'http://localhost:8080/';
 const file = process.argv[2] || path.join(__dirname, 'fixtures/early-format-backup.json');
 const input = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
+
+// Imports replace all data, so v2 asks in its own confirmation window: press its OK button
+async function acceptInAppConfirms(p) {
+  for(let i = 0; i < 3; i++) {
+    try { await p.click('#jtConfirm:not(.hidden) #jtConfirmOk', { timeout: 1500 }); await p.waitForTimeout(200); } catch(e) { break; }
+  }
+}
+
 let fail = 0; const ok = (n, c) => { console.log(c ? '✓' : '✗', n); if(!c) fail++; };
 (async () => {
   const b = await chromium.launch();
@@ -14,7 +22,7 @@ let fail = 0; const ok = (n, c) => { console.log(c ? '✓' : '✗', n); if(!c) f
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message)); p.on('dialog', d => d.accept());
   await p.goto(BASE); await p.waitForTimeout(500);
-  await p.setInputFiles('#fileImport', file); await p.waitForTimeout(800);
+  await p.setInputFiles('#fileImport', file); await acceptInAppConfirms(p); await p.waitForTimeout(800);
   const st = await p.evaluate(() => JSON.parse(localStorage.getItem('jt_v2')));
   ok('all jobs restored', st.jobs.length === input.jobs.length);
   ok('job records stored unchanged', JSON.stringify(st.jobs) === JSON.stringify(input.jobs));

@@ -55,6 +55,68 @@ function showToast(msg, type = '', opts) {
   t.addEventListener('focusin', () => clearTimeout(timer));
 }
 
+/* ───────────── Physical motion helpers (Apple-style) ─────────────
+   jtSpring: a spring defined like Apple's — damping ratio (1 = no bounce) and response (seconds).
+   It starts from the current value and the finger's velocity, can be stopped/retargeted any time,
+   and has no fixed duration. Values are in px. */
+function jtSpring({ from, to, velocity = 0, damping = 1, response = 0.35, onUpdate, onDone }) {
+  const k = Math.pow(2 * Math.PI / response, 2), c = 4 * Math.PI * damping / response;
+  let x = from, v = velocity, last = performance.now(), raf = 0, stopped = false;
+  const ctl = { get value() { return x; }, get velocity() { return v; }, stop() { stopped = true; cancelAnimationFrame(raf); } };
+  if(prefersReducedMotion()) { onUpdate(to); onDone && onDone(); return ctl; }
+  const tick = now => {
+    if(stopped) return;
+    let dt = Math.min(0.064, (now - last) / 1000); last = now;
+    while(dt > 0) { const h = Math.min(dt, 1 / 240); v += (-k * (x - to) - c * v) * h; x += v * h; dt -= h; }
+    if(Math.abs(v) < 2 && Math.abs(x - to) < 0.5) { x = to; onUpdate(x); onDone && onDone(); return; }
+    onUpdate(x);
+    raf = requestAnimationFrame(tick);
+  };
+  raf = requestAnimationFrame(tick);
+  return ctl;
+}
+// Where a flick would come to rest (Apple's projection; d ≈ 0.998 like scrolling)
+function jtProject(velocity, d = 0.998) { return (velocity / 1000) * d / (1 - d); }
+// Soft boundary: the further past it, the less the element follows
+function jtRubberband(over, dim, c = 0.55) { return (over * dim * c) / (dim + c * Math.abs(over)); }
+// Pointer velocity from the last ~100 ms of movement (px/s)
+function jtVelocity() {
+  const pts = [];
+  return {
+    add(x, y) { const t = performance.now(); pts.push({ x, y, t }); while(pts.length > 2 && t - pts[0].t > 100) pts.shift(); },
+    get() { if(pts.length < 2) return { x: 0, y: 0 }; const a = pts[0], b = pts[pts.length - 1], dt = Math.max(1, b.t - a.t) / 1000; return { x: (b.x - a.x) / dt, y: (b.y - a.y) / dt }; },
+  };
+}
+function jtBuzz(p) { try { if(navigator.vibrate) navigator.vibrate(p); } catch(e) {} }
+
+/* ───────────── In-app confirmation (replaces the browser's plain confirm box) ─────────────
+   Resolves true for OK, false for Cancel / Esc / tapping outside. */
+function jtConfirm(message, opts = {}) {
+  const ov = document.getElementById('jtConfirm');
+  if(!ov) return Promise.resolve(window.confirm(message));
+  document.getElementById('jtConfirmTitle').textContent = opts.title || 'Are you sure?';
+  document.getElementById('jtConfirmText').textContent = message || '';
+  const ok = document.getElementById('jtConfirmOk'), cancel = document.getElementById('jtConfirmCancel');
+  ok.textContent = opts.ok || 'OK';
+  cancel.textContent = opts.cancel || 'Cancel';
+  ok.className = 'btn ' + (opts.danger ? 'btn-danger' : 'btn-primary');
+  return new Promise(resolve => {
+    let done = false;
+    const finish = v => {
+      if(done) return; done = true;
+      mo.disconnect(); ok.onclick = cancel.onclick = null;
+      ov.classList.add('hidden');
+      resolve(v);
+    };
+    const mo = new MutationObserver(() => { if(ov.classList.contains('hidden')) finish(false); });
+    ok.onclick = () => finish(true);
+    cancel.onclick = () => finish(false);
+    ov.classList.remove('hidden');
+    mo.observe(ov, { attributes: true, attributeFilter: ['class'] });
+    setTimeout(() => cancel.focus({ preventScroll: true }), 80);   // the safe choice has focus
+  });
+}
+
 /* ───────────── Dialogs (all .overlay elements) ───────────── */
 const _openOverlays = [];
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
@@ -77,9 +139,23 @@ function _resetValidation(root) {
     g.querySelectorAll('[aria-invalid]').forEach(i => { i.removeAttribute('aria-invalid'); i.removeAttribute('aria-describedby'); });
   });
 }
+// Where the user last pressed: pop-up windows grow out of that point (desktop) instead of the screen centre
+let _lastPress = null;
+document.addEventListener('pointerdown', e => { _lastPress = { x: e.clientX, y: e.clientY, t: performance.now() }; }, true);
+function _anchorModal(ov) {
+  const modal = ov.querySelector('.modal');
+  if(!modal || ov.classList.contains('palette-overlay') || !window.matchMedia('(min-width: 560px)').matches) return;
+  let p = _lastPress && performance.now() - _lastPress.t < 1500 ? _lastPress : null;
+  const ae = ov._returnFocus;
+  if(!p && ae && ae !== document.body && ae.getBoundingClientRect) { const r = ae.getBoundingClientRect(); p = { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+  if(!p) { modal.style.transformOrigin = ''; return; }
+  const m = modal.getBoundingClientRect();
+  modal.style.transformOrigin = `${Math.round(p.x - m.left)}px ${Math.round(p.y - m.top)}px`;
+}
 function _onOverlayOpen(ov) {
   if(_openOverlays.includes(ov)) return;
   ov._returnFocus = document.activeElement;
+  _anchorModal(ov);
   _openOverlays.push(ov);
   _setBackgroundInert(true);
   _resetValidation(ov);

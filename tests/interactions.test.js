@@ -49,11 +49,11 @@ let fail = 0; const ok = (n, c, extra) => { console.log(c ? '✓' : '✗', n, ex
   // Hold + share + percentage
   const other = added.find(j => j.jobScope === 'Second scope').id;
   await p.fill('#jobSearch', ''); await p.evaluate(() => { setJobTab('all', null); }); await p.fill('#jobSearch', 'Second scope'); await p.waitForTimeout(200);
-  await p.click(`#jcard-${other} .act-btn.hold`); await p.fill('#holdDaysInput', '3'); await p.click('#holdModal .btn-primary'); await p.waitForTimeout(200);
+  await p.click(`#jcard-${other} .act-more`); await p.click('#rowMenu [data-act="hold"]'); await p.fill('#holdDaysInput', '3'); await p.click('#holdModal .btn-primary'); await p.waitForTimeout(200);
   j = (await jobs()).find(x => x.id === other); ok('hold sets holdStartDate/holdDays', !!j.holdStartDate && j.holdDays === 3);
   await p.fill(`#jcard-${other} .pct-form input`, '40'); await p.press(`#jcard-${other} .pct-form input`, 'Enter'); await p.waitForTimeout(200);
   j = (await jobs()).find(x => x.id === other); ok('quick % change updates progress + status', j.completionPercentage === 40 && j.status === 'ongoing');
-  await p.click(`#jcard-${other} .act-btn.share`); await p.waitForSelector('#shareJobModal:not(.hidden)');
+  await p.click(`#jcard-${other} .act-more`); await p.click('#rowMenu [data-act="share"]'); await p.waitForSelector('#shareJobModal:not(.hidden)');
   const person = await p.evaluate(() => JT.persons[1].name);
   await p.selectOption('#sharePerson', person); await p.fill('#shareTo', '2030-01-10'); await p.click('#shareJobModal .btn-block'); await p.waitForTimeout(200);
   j = (await jobs()).find(x => x.id === other); ok('share adds sharedJobDetails', j.sharedJobDetails && j.sharedJobDetails[0].personName === person);

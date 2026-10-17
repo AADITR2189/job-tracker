@@ -52,18 +52,17 @@ function finishLaunch() {
   const el = document.getElementById('launch');
   if(!el) return;
   const quick = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  setTimeout(() => {
-    el.classList.add('launch-done');
-    try { sessionStorage.setItem('jt_launched', '1'); } catch(e) {}
-    setTimeout(() => el.remove(), quick ? 0 : 380);
-  }, quick ? 0 : Math.max(0, 700 - performance.now()));
+  // No minimum wait: the launch screen leaves as soon as the app is ready
+  el.classList.add('launch-done');
+  try { sessionStorage.setItem('jt_launched', '1'); } catch(e) {}
+  setTimeout(() => el.remove(), quick ? 0 : 300);
 }
 // Scripts are deferred, so DOMContentLoaded always fires after this file has fully loaded.
 document.addEventListener('DOMContentLoaded', boot);
 
 // Animations (components/motion.js) load after the page is shown, so they never delay start-up
 // Extra features load the same way, in order, after start-up
-const LAZY_SCRIPTS = ['components/motion.js','components/drag.js','components/jobs-plus.js','components/planning-plus.js','components/insights.js','components/palette.js'];
+const LAZY_SCRIPTS = ['components/motion.js','components/drag.js','components/gestures.js','components/jobs-plus.js','components/planning-plus.js','components/insights.js','components/palette.js'];
 window.addEventListener('load', () => {
   LAZY_SCRIPTS.forEach(src => {
     const s = document.createElement('script');
@@ -371,6 +370,13 @@ function showPage(name, btn) {
     b.classList.toggle('active', !!on);
     if(on && b.dataset.page) b.setAttribute('aria-current','page'); else b.removeAttribute('aria-current');
   });
+  const more = document.querySelector('.bnav-btn[data-more]');
+  if(more) {
+    const MORE_PAGES = { upcoming: ['clock','Upcoming'], persons: ['users','Persons'], settings: ['settings','Settings'] };
+    const [icn, lbl] = MORE_PAGES[name] || ['menu', 'More'];
+    more.innerHTML = `${ic(icn)}<span>${lbl}</span>`;
+    more.setAttribute('aria-label', MORE_PAGES[name] ? `${lbl} (open menu: Upcoming, Persons, Settings and filters)` : 'More: Upcoming, Persons, Settings and filters');
+  }
   const title = PAGE_TITLES[name] || 'Job Tracker';
   const tt = document.getElementById('topbarTitle'); if(tt) tt.textContent = title;
   document.title = `${title} · Job Tracker – Stability`;
@@ -565,18 +571,18 @@ function renderJobCard(j, term) {
   const reworkRefs = j.status==='complete' && j.reworkHistory ? j.reworkHistory.filter(r=>r.reworkJobId).length : 0;
   const expanded = _expandedJobs.has(j.id);
   const flags = over ? `<span class="badge b-overdue">${ic('alert')}Overdue</span>` : approaching ? `<span class="badge b-due-soon">${ic('clock')}Due soon</span>` : '';
-  const statusBadges = `${statusBadge(j.status)}${j.isRework?`<span class="badge b-isrework">RW Rev.${esc(j.revisionNumber||'1')}</span>`:''}${reworkRefs?`<span class="badge b-isrework">${ic('rework')}${reworkRefs} Rework${reworkRefs>1?'s':''}</span>`:''}`;
+  const rwBadges = `${j.isRework?`<span class="badge b-isrework">RW Rev.${esc(j.revisionNumber||'1')}</span>`:''}${reworkRefs?`<span class="badge b-isrework">${ic('rework')}${reworkRefs} Rework${reworkRefs>1?'s':''}</span>`:''}`;
+  const pillCls = ({'ongoing':'b-ongoing','planned':'b-planned','not planned':'b-not-planned','complete':'b-complete','rework ongoing':'b-rework-ongoing','rework planned':'b-rework-planned','rework completed':'b-rework-completed','hold':'b-hold','cancelled':'b-cancelled'})[j.status]||'b-not-planned';
 
-  // Context-dependent actions (same handlers as v1)
+  // The most-used action for the job's state stays visible; the rest live in the "More" menu
   const ctx = j.status==='complete'
-    ? `<button type="button" class="act-btn rework" onclick="openReworkDialog(${j.id})" title="Reopen as Rework" aria-label="Reopen ${esc(label)} as rework">${ic('rework')}<span class="lbl">Rework</span></button>
-       <button type="button" class="act-btn qc" onclick="openChangeQC(${j.id})" title="Change QC" aria-label="Change QC for ${esc(label)}">${ic('check')}<span class="lbl">QC</span></button>`
+    ? `<button type="button" class="act-btn rework" onclick="openReworkDialog(${j.id})" title="Reopen as Rework" aria-label="Reopen ${esc(label)} as rework">${ic('rework')}<span class="lbl">Rework</span></button>`
     : j.status==='hold'
       ? `<button type="button" class="act-btn resume" onclick="resumeJob(${j.id})" title="Resume" aria-label="Resume ${esc(label)}">${ic('play')}<span class="lbl">Resume</span></button>`
-      : `<button type="button" class="act-btn hold${j.holdStartDate?' is-on':''}" onclick="openHold(${j.id})" title="${j.holdStartDate?'Manage Hold':'Hold Job'}" aria-label="${j.holdStartDate?'Manage hold for':'Hold'} ${esc(label)}">${ic('pause')}<span class="lbl">${j.holdStartDate?'Manage hold':'Hold'}</span></button>`;
+      : '';
 
   return `<article class="jrow ${over?'overdue':approaching?'due-soon':''}${expanded?' expanded':''}${_selectMode&&_selectedJobs.has(j.id)?' is-selected':''}" id="jcard-${j.id}" aria-label="${esc(label)}">
-    <div class="jrow-progress" style="--pct:${Math.min(100,pct)}%" aria-hidden="true"></div>
+    <div class="jrow-progress" style="--pct:${Math.min(100,pct)}%;--p:${Math.min(100,pct)/100}" aria-hidden="true"></div>
     <div class="jrow-main">
       ${_selectMode
         ? `<label class="jrow-check"><input type="checkbox" onchange="toggleJobSelect(${j.id},this.checked)"${_selectedJobs.has(j.id)?' checked':''} aria-label="Select ${esc(label)}"></label>`
@@ -584,7 +590,7 @@ function renderJobCard(j, term) {
       <div class="jc jc-num">
         <span class="badge b-jobnum">${hl(j.jobNumber||'—', term)}</span>
         ${flags}
-        <span class="jc-mobile-badges">${statusBadges}${priorityBadge(j.priorityLevel)}</span>
+        <span class="jc-mobile-badges">${rwBadges}${priorityBadge(j.priorityLevel)}</span>
       </div>
       <div class="jc jc-vessel">
         <button type="button" class="link-btn jrow-title" onclick="filterByVessel(${jsArg(vessel)})" title="Show all jobs for ${esc(vessel)}">${hl(vessel||'—', term)}</button>
@@ -598,7 +604,11 @@ function renderJobCard(j, term) {
         ${person?`<button type="button" class="link-btn" onclick="filterByPerson(${jsArg(person)})" title="Show jobs for ${esc(person)}">${hl(person, term)}</button>`:'<span class="muted">Unassigned</span>'}
         <span class="jrow-sub">${esc(j.location)}</span>
       </div>
-      <div class="jc jc-status">${statusBadges}<span class="st-prio">${priorityBadge(j.priorityLevel)}</span></div>
+      <div class="jc jc-status">
+        <label class="sr-only" for="st-${j.id}">Status for ${esc(label)}</label>
+        <select id="st-${j.id}" class="status-pill ${pillCls}" onchange="quickStatusChange(${j.id},this.value)" title="Change status">${statusOpts}</select>
+        ${rwBadges}<span class="st-prio">${priorityBadge(j.priorityLevel)}</span>
+      </div>
       <div class="jc jc-priority">${priorityBadge(j.priorityLevel)}</div>
       <div class="jc jc-meta">
         <span class="meta-item">${ic('users')}${person?`<button type="button" class="link-btn" onclick="filterByPerson(${jsArg(person)})">${hl(person, term)}</button>`:'<span class="muted">Unassigned</span>'}</span>
@@ -606,12 +616,12 @@ function renderJobCard(j, term) {
       </div>
       <div class="jc jc-target">
         <div class="jrow-date ${over?'is-over':''}"><small>Target</small>${fmtD(j.targetDate)}</div>
-        <div class="mini-progress" role="progressbar" aria-label="Completion" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="--pct:${Math.min(100,pct)}%"></span></div>
+        <div class="mini-progress" role="progressbar" aria-label="Completion" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><span style="--pct:${Math.min(100,pct)}%;--p:${Math.min(100,pct)/100}"></span></div>
         <span class="mini-pct">${pct}%</span>
       </div>
       <div class="jc jc-actions">
-        <label class="sr-only" for="st-${j.id}">Status for ${esc(label)}</label>
-        <select id="st-${j.id}" class="status-select" onchange="quickStatusChange(${j.id},this.value)" title="Status">${statusOpts}</select>
+        <label class="sr-only" for="sta-${j.id}">Status for ${esc(label)}</label>
+        <select id="sta-${j.id}" class="status-select" onchange="quickStatusChange(${j.id},this.value)" title="Status">${statusOpts}</select>
         <form class="pct-form" onsubmit="quickPctChange(${j.id},this.pct.value);return false;">
           <input name="pct" type="number" inputmode="numeric" min="0" max="100" value="${pct}" title="Completion %" aria-label="Completion percent for ${esc(label)}"
             onfocus="this.select()"
@@ -624,19 +634,59 @@ function renderJobCard(j, term) {
         </span>` : ''}
         <div class="act-group" role="group" aria-label="Actions for ${esc(label)}">
           <button type="button" class="act-btn edit" onclick="openEditJob(${j.id})" title="Edit" aria-label="Edit ${esc(label)}">${ic('edit')}<span class="lbl">Edit</span></button>
-          <button type="button" class="act-btn reassign" onclick="openReassign(${j.id})" title="Reassign" aria-label="Reassign ${esc(label)}">${ic('reassign')}<span class="lbl">Reassign</span></button>
-          <button type="button" class="act-btn shift" onclick="openShiftDate(${j.id})" title="Shift Date" aria-label="Shift target date of ${esc(label)}">${ic('cal-shift')}<span class="lbl">Date</span></button>
-          <button type="button" class="act-btn priority" onclick="openPriority(${j.id})" title="Priority" aria-label="Change priority of ${esc(label)}">${ic('flag')}<span class="lbl">Priority</span></button>
           ${ctx}
-          <button type="button" class="act-btn copy" onclick="duplicateJob(${j.id})" title="Copy job" aria-label="Copy ${esc(label)} to a new job">${ic('copy')}<span class="lbl">Copy</span></button>
-          <button type="button" class="act-btn share" onclick="openShareJob(${j.id})" title="Share job with another person" aria-label="Share ${esc(label)} with another person">${ic('share')}<span class="lbl">Share</span></button>
-          <button type="button" class="act-btn del" onclick="deleteJob(${j.id})" title="Delete" aria-label="Delete ${esc(label)}">${ic('trash')}<span class="lbl">Delete</span></button>
+          <button type="button" class="act-btn act-more" onclick="openRowMenu(${j.id},this)" aria-haspopup="menu" aria-expanded="false" title="More actions" aria-label="More actions for ${esc(label)}">${ic('more')}<span class="lbl">More</span></button>
         </div>
       </div>
     </div>
     <div class="jrow-details${expanded?' open':''}" id="jdet-${j.id}"${expanded?'':' hidden'}><div class="jd-inner">${expanded?jobDetailsHTML(j):''}</div></div>
   </article>`;
 }
+
+// ── Row "More" menu: secondary actions, opened from (and anchored to) the row's More button ──
+function openRowMenu(id, btn) {
+  const j = JT.jobs.find(x => x.id === id); if(!j) return;
+  closeRowMenu();
+  const items = [
+    ['reassign', 'reassign', 'Reassign', `openReassign(${id})`],
+    ['shift', 'cal-shift', 'Change target date', `openShiftDate(${id})`],
+    ['priority', 'flag', 'Change priority', `openPriority(${id})`],
+  ];
+  if(j.status === 'complete') items.push(['qc', 'check', 'Change QC', `openChangeQC(${id})`]);
+  else if(j.status !== 'hold') items.push(['hold', 'pause', j.holdStartDate ? 'Manage hold' : 'Put on hold', `openHold(${id})`]);
+  items.push(['copy', 'copy', 'Copy to a new job', `duplicateJob(${id})`], ['share', 'share', 'Share with another person', `openShareJob(${id})`], ['del', 'trash', 'Delete', `deleteJob(${id})`]);
+  const m = document.createElement('div');
+  m.className = 'menu row-menu'; m.id = 'rowMenu'; m.setAttribute('role', 'menu');
+  m.setAttribute('aria-label', `Actions for ${j.jobNumber || 'job'} ${j.vesselName || ''}`.trim());
+  m.innerHTML = items.map(([k, icn, t, fn]) => `<button type="button" role="menuitem" class="menu-item${k === 'del' ? ' is-danger' : ''}" data-act="${k}" onclick="closeRowMenu(true);${fn}">${ic(icn)}<span>${t}</span></button>`).join('');
+  document.body.appendChild(m);
+  // Place under the button (or above when there is no room), growing out of the button
+  const r = btn.getBoundingClientRect(), mh = m.offsetHeight, mw = m.offsetWidth;
+  const up = r.bottom + mh + 8 > innerHeight && r.top - mh - 8 > 0;
+  const left = Math.max(8, Math.min(innerWidth - mw - 8, r.right - mw));
+  m.style.left = left + 'px'; m.style.top = (up ? r.top - mh - 6 : r.bottom + 6) + 'px';
+  m.style.transformOrigin = `${Math.round(r.left + r.width / 2 - left)}px ${up ? '100%' : '0'}`;
+  btn.setAttribute('aria-expanded', 'true');
+  m._btn = btn;
+  m.addEventListener('keydown', e => {
+    const its = [...m.querySelectorAll('.menu-item')], i = its.indexOf(document.activeElement);
+    if(e.key === 'ArrowDown') { e.preventDefault(); its[(i + 1) % its.length].focus(); }
+    else if(e.key === 'ArrowUp') { e.preventDefault(); its[(i - 1 + its.length) % its.length].focus(); }
+    else if(e.key === 'Home') { e.preventDefault(); its[0].focus(); }
+    else if(e.key === 'End') { e.preventDefault(); its[its.length - 1].focus(); }
+    else if(e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); closeRowMenu(); }
+  });
+  setTimeout(() => m.querySelector('.menu-item')?.focus({ preventScroll: true }), 0);
+}
+function closeRowMenu(chosen) {
+  const m = document.getElementById('rowMenu'); if(!m) return;
+  const btn = m._btn;
+  m.remove();
+  if(btn) { btn.setAttribute('aria-expanded', 'false'); if(!chosen && document.contains(btn)) btn.focus({ preventScroll: true }); }
+}
+document.addEventListener('pointerdown', e => { const m = document.getElementById('rowMenu'); if(m && !m.contains(e.target) && !e.target.closest('.act-more')) closeRowMenu(true); }, true);
+window.addEventListener('resize', () => closeRowMenu(true));
+document.addEventListener('scroll', () => closeRowMenu(true), true);
 
 // Expand / collapse the details panel of a job row
 function toggleJobDetails(id, btn) {
@@ -883,7 +933,13 @@ function selectAllVisible(on) {
 function updateBulkBar() {
   const bar = document.getElementById('bulkBar');
   if(!bar) return;
-  bar.hidden = !_selectMode;
+  // Leaves the way it came in (fades up), instead of vanishing
+  if(!_selectMode && !bar.hidden && !prefersReducedMotion() && !bar._leaving) {
+    bar._leaving = true;
+    bar.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-6px)' }], { duration: 160, easing: 'cubic-bezier(.4,0,1,1)' })
+      .finished.then(() => { bar._leaving = false; if(!_selectMode) bar.hidden = true; }, () => { bar._leaving = false; });
+  } else if(!bar._leaving) bar.hidden = !_selectMode;
+  if(_selectMode) bar.hidden = false;
   const n = _selectedJobs.size;
   const c = document.getElementById('bulkCount'); if(c) c.textContent = `${n} selected`;
   bar.querySelectorAll('[data-needs-sel]').forEach(el => el.disabled = !n);
@@ -906,7 +962,6 @@ function bulkApply(kind, value) {
   const jobs = JT.jobs.filter(j => _selectedJobs.has(j.id));
   if(!jobs.length || !value) return;
   if(kind === 'delete') {
-    if(!confirm(`Delete ${jobs.length} job${jobs.length>1?'s':''}?`)) return;
     JT.jobs = JT.jobs.filter(j => !_selectedJobs.has(j.id));
     _selectedJobs.clear();
   } else jobs.forEach(j => {
@@ -1529,8 +1584,8 @@ function renderPlanning() {
           html += `<div class="plan-chip upcoming" data-up="${j.id}" data-from="${ds}" role="button" tabindex="0"
             onclick="event.stopPropagation();openUpcomingChipPopup(event,${j.id})"
             title="UPCOMING · ${esc(vessel)} · ${esc(scope)}" aria-label="Upcoming: ${esc(vessel)}, ${esc(scope)}, day ${dayNum} of ${totalDays}">
-            <div class="chip-t">${esc(scope.substring(0,14))}${scope.length>14?'…':''}</div>
-            <div class="chip-s">${esc(vessel.substring(0,12))}${vessel.length>12?'…':''}</div>
+            <div class="chip-t">${esc(scope)}</div>
+            <div class="chip-s">${esc(vessel)}</div>
             <div class="chip-f"><span>D${dayNum}/${totalDays}</span><span>Upcoming</span></div>
           </div>`;
         } else {
@@ -1539,8 +1594,8 @@ function renderPlanning() {
             onclick="event.stopPropagation();openJobChipPopup(event,${j.id})"
             style="background:${chipColor};color:${readableTextOn(chipColor)};box-shadow:0 1px 3px rgba(0,0,0,.15)${isLastDay?',inset -3px 0 0 rgba(255,255,255,.25)':''}"
             title="${esc(vessel)} · ${esc(scope)} · ${pct}% (D${dayNum}/${totalDays})" aria-label="${esc(vessel)}, ${esc(scope)}, ${j.status}, ${pct}% complete, day ${dayNum} of ${totalDays}${isOverdue(j)?', overdue':''}. Open job">
-            <div class="chip-t">${esc(scope.substring(0,14))}${scope.length>14?'…':''}</div>
-            <div class="chip-s">${esc(vessel.substring(0,12))}${vessel.length>12?'…':''}</div>
+            <div class="chip-t">${esc(scope)}</div>
+            <div class="chip-s">${esc(vessel)}</div>
             <div class="chip-f"><span>D${dayNum}/${totalDays}</span><span>${pct}%</span></div>
             <div class="chip-fill" aria-hidden="true" style="--done:${pct}%;--rest:${Math.max(0,100-pct)}%"><div class="done"></div><div class="rest"></div></div>
           </div>`;
@@ -1705,8 +1760,8 @@ function openJobChipPopup(evt, jobId) {
   showPage('jobs', document.querySelectorAll('.nav-btn')[1]);
   setJobTab(tab, null);
 
-  // Scroll the job card into view and highlight it
-  setTimeout(() => {
+  // Scroll the job card into view and highlight it (next frame, once the page has rendered)
+  requestAnimationFrame(() => {
     flushJobRender(); // rows are rendered progressively; make sure this one exists
     const card = document.getElementById('jcard-' + jobId);
     if(card) {
@@ -1717,7 +1772,7 @@ function openJobChipPopup(evt, jobId) {
       const exp = card.querySelector('.jrow-expand');
       if(exp) exp.focus({ preventScroll: true });
     }
-  }, 150);
+  });
 }
 
 function chipQuickStatus() {
@@ -1732,7 +1787,7 @@ function chipQuickStatus() {
   j.status = newStatus;
   if(j.status==='ongoing'&&!j.startDate)j.startDate=today();
   save(); closeModal('jobChipModal');
-  setTimeout(()=>renderAll(), 30);
+  renderAll();
   showToast('Status updated','ok');
 }
 
@@ -1787,7 +1842,6 @@ function renderUpcoming() {
 function moveToTracking(id) {
   const j = JT.upcomingJobs.find(x=>x.id===id);
   if(!j) return;
-  if(!confirm(`Move "${j.jobScope}" (${j.vesselName}) to the main job list?`)) return;
   // Create a new job from the upcoming job data
   const newJob = {
     id: nextId(),
@@ -1827,7 +1881,7 @@ function moveToTracking(id) {
   JT.upcomingJobs = JT.upcomingJobs.filter(u=>u.id!==id);
   save();
   renderAll();
-  showToast(`"${j.jobScope}" moved to job tracker as Planned`,'ok');
+  toastUndo(`"${j.jobScope}" moved to job tracker as Planned`);
 }
 
 // ===================== PERSONS =====================
@@ -2094,7 +2148,6 @@ function saveJob() {
 }
 
 function deleteJob(id){
-  if(!confirm('Delete this job?'))return;
   JT.jobs=JT.jobs.filter(j=>j.id!==id);save();renderAll();toastUndo('Job deleted');
 }
 
@@ -2120,7 +2173,7 @@ function doReassign(){
   j.startDate=reassignDate;
   if(!['ongoing','rework ongoing'].includes(j.status)) j.status='planned';
   save();closeModal('reassignModal');
-  setTimeout(()=>renderAll(),30);
+  renderAll();
   toastUndo(`Reassigned to ${newPerson||'?'} (${pctAtHandover}% done by ${prev||'?'})`);
 }
 
@@ -2198,13 +2251,13 @@ function doHold(){
   j.holdDays=parseInt(document.getElementById('holdDaysInput')?.value)||null;
   j.holdReason=document.getElementById('holdReason')?.value||'';
   // Keep status unchanged — job stays in active list
-  save();closeModal('holdModal');setTimeout(()=>renderAll(),30);
+  save();closeModal('holdModal');renderAll();
   showToast(j.holdDays?`Job held for ${j.holdDays} day(s)`:'Job held (indefinitely)','ok');
 }
 function doUnhold(){
   const j=JT.jobs.find(x=>x.id===actionJobId); if(!j) return;
   j.holdStartDate=null;j.holdDays=null;j.holdReason=null;
-  save();closeModal('holdModal');setTimeout(()=>renderAll(),30);
+  save();closeModal('holdModal');renderAll();
   showToast('Job unholded — back in planning','ok');
 }
 function doExtendHold(){
@@ -2212,7 +2265,7 @@ function doExtendHold(){
   const extra=parseInt(document.getElementById('holdExtendDays')?.value)||0;
   if(!extra){showToast('Enter days to extend','err');return;}
   j.holdDays=(j.holdDays||0)+extra;
-  save();closeModal('holdModal');setTimeout(()=>renderAll(),30);
+  save();closeModal('holdModal');renderAll();
   showToast(`Hold extended by ${extra} day(s)`,'ok');
 }
 function resumeJob(id){
@@ -2238,7 +2291,7 @@ function savePerson(){
   else{d.id=nextId();JT.persons.push(d);showToast('Person added','ok');}
   save();closeModal('personModal');renderAll();
 }
-function deletePerson(id){if(!confirm('Remove person?'))return;JT.persons=JT.persons.filter(p=>p.id!==id);save();renderAll();showToast('Person removed');}
+function deletePerson(id){JT.persons=JT.persons.filter(p=>p.id!==id);save();renderAll();toastUndo('Person removed');}
 
 // ===== UPCOMING =====
 function openAddUpcoming(){
@@ -2300,7 +2353,7 @@ function saveUpcoming(){
   }
   save();closeModal('upcomingModal');renderUpcoming();
 }
-function deleteUpcoming(id){if(!confirm('Remove?'))return;JT.upcomingJobs=JT.upcomingJobs.filter(u=>u.id!==id);save();renderUpcoming();showToast('Removed');}
+function deleteUpcoming(id){JT.upcomingJobs=JT.upcomingJobs.filter(u=>u.id!==id);save();renderUpcoming();toastUndo('Upcoming job removed');}
 
 // ===== IMPORT / EXPORT =====
 
@@ -2799,7 +2852,7 @@ function triggerImport(){document.getElementById('fileImport').click();}
 function doImport(evt){
   const f=evt.target.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=e=>{
+  r.onload=async e=>{
     try{
       let d;
       try { d=JSON.parse(jtStripBom(e.target.result)); }
@@ -2818,10 +2871,10 @@ function doImport(evt){
       ];
       if(check.warnings.length) lines.push('', 'Notes:', ...check.warnings.map(w=>'• '+w));
       lines.push('', 'This will REPLACE all current data.', 'A safety copy of your current data is kept — you can undo this from Settings.');
-      if(!confirm(lines.join('\n')))return;
+      if(!(await jtConfirm(lines.slice(2).join('\n'), { title: lines[0], ok: 'Replace my data', danger: true })))return;
 
       if(JT.jobs.length || JT.persons.length) {
-        if(!jtSnapshotBeforeImport(JT, f.name) && !confirm('There is not enough space to keep a safety copy of your current data.\n\nExport a backup first if you may need it. Continue with the import anyway?')) return;
+        if(!jtSnapshotBeforeImport(JT, f.name) && !(await jtConfirm('Export a backup first if you may need it. Continue with the import anyway?', { title: 'Not enough space for a safety copy', ok: 'Import anyway', danger: true }))) return;
       }
 
       JT = {jobs:d.jobs||[],persons:d.persons||[],upcomingJobs:d.upcomingJobs||[],
@@ -2837,11 +2890,11 @@ function doImport(evt){
 }
 
 // Restore the data that was in the app right before the last import
-function undoLastImport() {
+async function undoLastImport() {
   const meta = jtGetPreImportMeta();
   const prev = jtReadPreImport();
   if(!meta || !prev) { showToast('There is no import to undo','err'); renderSettingsInfo(); return; }
-  if(!confirm(`Restore the data from before the last import?\n\nIt has ${meta.jobs} jobs and ${meta.persons} persons (saved ${new Date(meta.at).toLocaleString('en-GB')}).\n\nThe currently loaded data will be replaced.`)) return;
+  if(!(await jtConfirm(`It has ${meta.jobs} jobs and ${meta.persons} persons (saved ${new Date(meta.at).toLocaleString('en-GB')}).\n\nThe currently loaded data will be replaced.`, { title: 'Restore the data from before the last import?', ok: 'Restore', danger: true }))) return;
   JT = {jobs:prev.jobs,persons:prev.persons,upcomingJobs:prev.upcomingJobs,
     holidays:prev.holidays,workingDays:prev.workingDays,
     personHolidays:prev.personHolidays,compensationWorkingDays:prev.compensationWorkingDays};
@@ -2902,7 +2955,7 @@ function quickStatusChange(id, newStatus) {
   j.status = newStatus;
   if(newStatus==='ongoing' && !j.startDate) j.startDate = today();
   save();
-  setTimeout(()=>renderAll(), 30);
+  renderAll();
   toastUndo(`Status updated to "${newStatus}"`);
 }
 
@@ -3031,7 +3084,7 @@ function confirmCompletion() {
   save();
   closeModal('completionDateModal');
   if(typeof _completionCallback === 'function') _completionCallback();
-  setTimeout(() => renderAll(), 30);
+  renderAll();
   toastUndo('Job marked complete — ' + completionDate);
 }
 
@@ -3043,7 +3096,7 @@ function openUpcomingChipPopup(evt, upcomingId) {
   evt.stopPropagation();
   // Navigate directly to Upcoming page and highlight the job
   showPage('upcoming', document.querySelectorAll('.nav-btn')[3]);
-  setTimeout(() => {
+  requestAnimationFrame(() => {
     // Find the upcoming job row and scroll + flash it
     const rows = document.querySelectorAll('#upcomingList .up-card');
     let found = false;
@@ -3061,7 +3114,7 @@ function openUpcomingChipPopup(evt, upcomingId) {
       // Fallback: just show the upcoming page
       showToast('Upcoming job found on this page', 'ok');
     }
-  }, 150);
+  });
 }
 
 function openShareJob(id) {
@@ -3513,6 +3566,7 @@ function initScrollTop() {
   const content = document.getElementById('contentScroll');
   if(!content) return;
   content.addEventListener('scroll', () => {
+    document.documentElement.classList.toggle('is-scrolled', content.scrollTop > 2);
     const btn = document.getElementById('rptScrollTop');
     if(!btn) return;
     // v1 showed this on Reports only; long lists (Jobs, Planning) benefit too
