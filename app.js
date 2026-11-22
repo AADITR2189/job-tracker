@@ -668,6 +668,7 @@ function openRowMenu(id, btn) {
   m.style.transformOrigin = `${Math.round(r.left + r.width / 2 - left)}px ${up ? '100%' : '0'}`;
   btn.setAttribute('aria-expanded', 'true');
   m._btn = btn;
+  m._at = { x: r.left, y: r.top };   // where the button was when the menu opened
   m.addEventListener('keydown', e => {
     const its = [...m.querySelectorAll('.menu-item')], i = its.indexOf(document.activeElement);
     if(e.key === 'ArrowDown') { e.preventDefault(); its[(i + 1) % its.length].focus(); }
@@ -676,8 +677,14 @@ function openRowMenu(id, btn) {
     else if(e.key === 'End') { e.preventDefault(); its[its.length - 1].focus(); }
     else if(e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); closeRowMenu(); }
   });
-  setTimeout(() => m.querySelector('.menu-item')?.focus({ preventScroll: true }), 0);
+  m.querySelector('.menu-item')?.focus({ preventScroll: true });
 }
+// Esc closes the menu even if focus is not inside it yet (e.g. pressed straight after opening)
+document.addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  const m = document.getElementById('rowMenu');
+  if(m && !m.contains(e.target)) { e.preventDefault(); e.stopPropagation(); closeRowMenu(); }
+}, true);
 function closeRowMenu(chosen) {
   const m = document.getElementById('rowMenu'); if(!m) return;
   const btn = m._btn;
@@ -686,7 +693,13 @@ function closeRowMenu(chosen) {
 }
 document.addEventListener('pointerdown', e => { const m = document.getElementById('rowMenu'); if(m && !m.contains(e.target) && !e.target.closest('.act-more')) closeRowMenu(true); }, true);
 window.addEventListener('resize', () => closeRowMenu(true));
-document.addEventListener('scroll', () => closeRowMenu(true), true);
+// Close on scroll only when the button has really moved: a scroll event can arrive just after the
+// menu opened, for a scroll that finished before it (e.g. a tap right after the list stopped moving).
+document.addEventListener('scroll', () => {
+  const m = document.getElementById('rowMenu'); if(!m) return;
+  const r = m._btn?.getBoundingClientRect();
+  if(!r || !m._at || Math.abs(r.top - m._at.y) > 1 || Math.abs(r.left - m._at.x) > 1) closeRowMenu(true);
+}, true);
 
 // Expand / collapse the details panel of a job row
 function toggleJobDetails(id, btn) {

@@ -195,7 +195,10 @@ const SHOTS = process.env.SHOTS;   // optional folder for screenshots
   ok('planning shows busy level per cell and per person', ranges.cap && ranges.util > 0, ranges);
   await p.waitForTimeout(400);
   const chipInfo = await p.evaluate(() => {
-    const c = [...document.querySelectorAll('#planTable .plan-chip[data-own="1"]')].find(c => { const td = c.closest('td'); return td.nextElementSibling && td.nextElementSibling.matches('td.pc'); });
+    // The sample data has fixed dates, so "this week" can be empty: step back week by week to one with a draggable chip
+    const find = () => [...document.querySelectorAll('#planTable .plan-chip[data-own="1"]')].find(c => { const td = c.closest('td'); return td.nextElementSibling && td.nextElementSibling.matches('td.pc'); });
+    let c = find();
+    for(let i = 0; !c && i < 52; i++) { planShift(-1); c = find(); }
     if(!c) return null;
     c.scrollIntoView({ block: 'center', inline: 'center' });
     const j = JT.jobs.find(x => x.id === Number(c.dataset.job));
