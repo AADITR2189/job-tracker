@@ -101,6 +101,7 @@
     <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></symbol>
     <symbol id="i-wifi-off" viewBox="0 0 24 24"><path d="m2 2 20 20M8.5 16.5a5 5 0 0 1 7 0M2 8.82a15 15 0 0 1 4.17-2.65M10.66 5c4.01-.36 8.14.9 11.34 3.76M16.85 11.25a10 10 0 0 1 2.22 1.68M5 13a10 10 0 0 1 5.24-2.76M12 20h.01"/></symbol>
     <symbol id="i-install" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><path d="M12 7v7M9 11l3 3 3-3M10 18h4"/></symbol>
+    <symbol id="i-brand" viewBox="0 0 256 256"><g fill="currentColor" stroke="none"><rect x="16" y="44" width="208" height="32" rx="16"/><rect x="56" y="92" width="168" height="32" rx="16"/><rect x="96" y="140" width="128" height="32" rx="16"/><rect x="136" y="188" width="88" height="32" rx="16"/></g></symbol>
     <symbol id="i-anchor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><path d="M12 22V8M5 12H2a10 10 0 0 0 20 0h-3"/></symbol>
     <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></symbol>
     <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></symbol>
@@ -147,7 +148,7 @@
 <!-- ===== SIDEBAR (desktop) / DRAWER (mobile) ===== -->
 <aside class="sidebar" id="sidebar" aria-label="Navigation and filters">
   <div class="sidebar-brand">
-    <div class="logo-icon" aria-hidden="true"><svg class="ic"><use href="#i-anchor"/></svg></div>
+    <div class="logo-icon" aria-hidden="true"><svg class="ic"><use href="#i-brand"/></svg></div>
     <div class="logo-text"><strong>Job Tracker</strong><span>Stability Engineering</span></div>
     <button type="button" class="icon-btn drawer-close" onclick="closeDrawer()" aria-label="Close menu"><svg class="ic"><use href="#i-x"/></svg></button>
   </div>
@@ -209,7 +210,7 @@
   <header class="topbar">
     <button type="button" class="icon-btn menu-btn" id="menuBtn" onclick="openDrawer()" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false"><svg class="ic"><use href="#i-menu"/></svg></button>
     <div class="topbar-title">
-      <span class="logo-icon sm" aria-hidden="true"><svg class="ic"><use href="#i-anchor"/></svg></span>
+      <span class="logo-icon sm" aria-hidden="true"><svg class="ic"><use href="#i-brand"/></svg></span>
       <span id="topbarTitle">Dashboard</span>
     </div>
     <span class="net-pill" id="netStatus" role="status" hidden><svg class="ic" aria-hidden="true"><use href="#i-wifi-off"/></svg><span>Offline</span></span>

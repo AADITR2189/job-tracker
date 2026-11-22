@@ -1,0 +1,31 @@
+{
+  "brand": "Job Tracker",
+  "tagline": "Stability engineering jobs, planned and tracked",
+  "brief": "An offline-first app for a naval stability engineering team to track jobs, scopes, day-wise planning, team availability and reports. The mark should feel steady, precise and organised, and replace a generic stock anchor icon.",
+  "adjectives": ["steady", "precise", "organised", "trustworthy"],
+  "criteria": "Success: ties planning to ships, recognisable at 16 px, works in one colour, keeps the app's deep olive green.",
+  "industry": "consumer-app",
+  "mockups": ["app-icon", "favicon-tab", "website", "business-card", "badge", "sticker"],
+  "nav": ["Jobs", "Planning", "Reports"],
+  "brand_color": "#2E3D28",
+  "tile_color": "#2E3D28",
+  "greyscale": false,
+  "designer": "Job Tracker",
+  "round": 2,
+  "concepts": [
+    {
+      "name": "Planning Hull",
+      "symbol": "../logo/symbol.svg",
+      "lockup": "../logo/lockup-horizontal.svg",
+      "idea": "Four schedule bars, shortest at the bottom, form the side view of a ship: the planning board is the hull.",
+      "rationale": [
+        "Joins the two things the app is about: planning and ships",
+        "Built from one shape (a rounded bar) on a 16-unit grid",
+        "A heavier three-bar cut keeps it clear at 16 px",
+        "Deep olive green stands apart from blue productivity apps"
+      ]
+    }
+  ],
+  "recommendation": "Planning Hull, in deep olive (#2E3D28) with white on dark backgrounds.",
+  "next_steps": ["Live in the app: icons, favicon and header updated", "Check it on your phone's home screen", "Optional: professional trademark search before wider use"]
+}

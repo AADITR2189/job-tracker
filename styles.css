@@ -295,7 +295,7 @@ img, svg { display: block; max-width: 100%; }
   width: 36px; height: 36px; border-radius: 10px;
   display: grid; place-items: center; flex-shrink: 0;
   color: #fff;
-  background: linear-gradient(135deg, #2E3D28 0%, #6F8A55 100%);
+  background: #2E3D28;
   box-shadow: 0 4px 12px -2px rgba(46, 61, 40, .45);
 }
 .logo-icon .ic { width: 20px; height: 20px; }

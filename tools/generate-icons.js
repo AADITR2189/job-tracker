@@ -8,11 +8,13 @@ const logo = fs.readFileSync(path.join(root, 'assets/logo.svg'), 'utf8');
 
 // Maskable: full-bleed background, artwork inside the central 80% safe zone
 const maskable = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2E3D28"/><stop offset="1" stop-color="#6F8A55"/></linearGradient></defs>
-  <rect width="512" height="512" fill="url(#g)"/>
-  <g transform="translate(136 136) scale(10)" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="5" r="3"/><path d="M12 22V8M8.5 11h7"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/>
+  <rect width="512" height="512" fill="#2E3D28"/>
+  <g fill="#fff" transform="translate(140.8 140.8) scale(0.9)">
+    <rect x="16" y="44" width="208" height="32" rx="16"/><rect x="56" y="92" width="168" height="32" rx="16"/>
+    <rect x="96" y="140" width="128" height="32" rx="16"/><rect x="136" y="188" width="88" height="32" rx="16"/>
   </g></svg>`;
+// Small-size cut (three heavier bars) for the 32 px favicon
+const small = fs.readFileSync(path.join(root, 'icons/favicon.svg'), 'utf8');
 
 const splashes = [[1320,2868],[1206,2622],[1290,2796],[1179,2556],[1284,2778],[1170,2532],[1125,2436],[1242,2688],[828,1792],[1242,2208],[750,1334],[2048,2732],[1668,2388],[1640,2360],[1620,2160],[1536,2048]];
 
@@ -30,7 +32,7 @@ const splashes = [[1320,2868],[1206,2622],[1290,2796],[1179,2556],[1284,2778],[1
   await shot(maskable, 192, 'icons/maskable-192.png', { opaque: true });
   await shot(maskable, 512, 'icons/maskable-512.png', { opaque: true });
   await shot(maskable, 180, 'icons/apple-touch-icon.png', { opaque: true }); // iOS rounds corners itself
-  await shot(logo, 32, 'icons/favicon-32.png');
+  await shot(small, 32, 'icons/favicon-32.png');
   await shot(logo, 150, 'icons/mstile-150.png');
 
   for (const [w, h] of splashes) {
